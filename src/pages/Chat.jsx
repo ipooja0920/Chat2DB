@@ -22,7 +22,8 @@ export default function Chat() {
   const [resultsTab, setResultsTab] = useState("Results");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const currentQuery = sampleQueries[activeTab] || sampleQueries["1"];
+  const isNewQuery = !sampleQueries[activeTab] && tabs.find((t) => t.id === activeTab)?.title === "New Query";
+  const currentQuery = sampleQueries[activeTab];
 
   const handleSelectConversation = useCallback((id) => {
     setActiveConversation(id);
@@ -37,13 +38,21 @@ export default function Chat() {
   }, [tabs, conversations]);
 
   const handleCloseTab = useCallback((id) => {
+    const closingTab = tabs.find((t) => t.id === id);
+    const isNew = closingTab?.title === "New Query" && !sampleQueries[id];
+
     setTabs((prev) => {
       const next = prev.filter((t) => t.id !== id);
-      if (next.length === 0) return prev;
-      if (activeTab === id) setActiveTab(next[0].id);
+      if (activeTab === id) {
+        if (isNew || next.length === 0) {
+          setActiveTab("dashboard");
+        } else {
+          setActiveTab(next[0].id);
+        }
+      }
       return next;
     });
-  }, [activeTab]);
+  }, [activeTab, tabs]);
 
   const handleAddTab = useCallback(() => {
     const id = Date.now().toString();
@@ -100,31 +109,46 @@ export default function Chat() {
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden bg-card mx-5 mb-0 rounded-t-xl border border-b-0 border-border shadow-sm">
-          <QuestionHeader
-            question={currentQuery.question}
-            time={currentQuery.time}
-            intent={currentQuery.intent}
-            mode={currentQuery.mode}
-            sources={currentQuery.sources}
-          />
-
-          <StatsCards stats={currentQuery.stats} />
-
-          <ResultsTabs activeTab={resultsTab} onTabChange={setResultsTab} />
-
-          {resultsTab === "Results" && currentQuery.data ? (
-            <DataTable
-              columns={currentQuery.columns}
-              data={currentQuery.data}
-              totalLabel={currentQuery.totalLabel}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-              {resultsTab} view coming soon
+          {activeTab === "dashboard" || !currentQuery ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 p-10">
+              <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center">
+                <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-12m12-11.25V3m0 13.5v3.75m-12-3.75v3.75m0 0h12" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <h2 className="text-xl font-semibold text-foreground mb-2">Welcome to Chat2DB</h2>
+                <p className="text-muted-foreground text-sm max-w-sm">
+                  Ask a question about your database to get started, or select a conversation from the history.
+                </p>
+              </div>
+              <FollowUpInput onSend={handleFollowUp} />
             </div>
+          ) : (
+            <>
+              <QuestionHeader
+                question={currentQuery.question}
+                time={currentQuery.time}
+                intent={currentQuery.intent}
+                mode={currentQuery.mode}
+                sources={currentQuery.sources}
+              />
+              <StatsCards stats={currentQuery.stats} />
+              <ResultsTabs activeTab={resultsTab} onTabChange={setResultsTab} />
+              {resultsTab === "Results" && currentQuery.data ? (
+                <DataTable
+                  columns={currentQuery.columns}
+                  data={currentQuery.data}
+                  totalLabel={currentQuery.totalLabel}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                  {resultsTab} view coming soon
+                </div>
+              )}
+              <FollowUpInput onSend={handleFollowUp} />
+            </>
           )}
-
-          <FollowUpInput onSend={handleFollowUp} />
         </div>
       </div>
     </div>
