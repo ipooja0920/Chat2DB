@@ -4,6 +4,7 @@ import StatsCards from "./StatsCards";
 import ResultsTabs from "./ResultsTabs";
 import DataTable from "./DataTable";
 import FollowUpInput from "./FollowUpInput";
+import ChartView from "./ChartView";
 import { Loader2 } from "lucide-react";
 
 export default function QueryView({ queryData, loading, onFollowUp, mode, llm }) {
@@ -52,6 +53,12 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm })
           data={queryData.rows || []}
           totalLabel="rows"
         />
+      ) : resultsTab === "Chart" ? (
+        <ChartView
+          question={queryData.question}
+          columns={queryData.columns || []}
+          rows={queryData.rows || []}
+        />
       ) : resultsTab === "SQL" ? (
         <div className="flex-1 p-6 overflow-auto">
           <pre className="bg-secondary rounded-xl p-4 text-sm font-mono text-foreground whitespace-pre-wrap border border-border">
@@ -64,7 +71,7 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm })
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          {resultsTab} view not available
+          {resultsTab} view coming soon
         </div>
       )}
       <FollowUpInput onSend={onFollowUp} />
