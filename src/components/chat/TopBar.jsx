@@ -1,5 +1,5 @@
 import React from "react";
-import { Info, Moon, Database, ChevronDown } from "lucide-react";
+import { Info, Database, ChevronDown } from "lucide-react";
 
 export default function TopBar() {
   return (
@@ -21,9 +21,6 @@ export default function TopBar() {
           <Database className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-medium">Chinook DB</span>
           <ChevronDown className="w-3 h-3 text-muted-foreground" />
-        </button>
-        <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
-          <Moon className="w-4 h-4 text-muted-foreground" />
         </button>
         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
           P
