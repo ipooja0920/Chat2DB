@@ -39,16 +39,25 @@ export default function Evals() {
     });
     setRunningId(record.id);
 
-    // Invoke backend function
-    await base44.functions.invoke("runEvals", {
-      eval_run_id: record.id,
-      test_cases: testCases,
-      pipeline,
-      llm,
-      database,
-      db_schema: dbSchema,
-      run_name: runName
-    });
+    try {
+      // Invoke backend function
+      await base44.functions.invoke("runEvals", {
+        eval_run_id: record.id,
+        test_cases: testCases,
+        pipeline,
+        llm,
+        database,
+        db_schema: dbSchema,
+        run_name: runName
+      });
+    } catch (err) {
+      // Mark as failed if the function times out or errors
+      await base44.entities.EvalResult.update(record.id, {
+        status: "failed"
+      });
+      setRunningId(null);
+      throw err;
+    }
 
     setRunningId(null);
     await loadHistory();
