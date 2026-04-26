@@ -276,6 +276,20 @@ Query Result (columns + rows)
   - Bar for comparisons
   - Scatter for correlation
 
+### Why Single-Agent Hybrid Over Multi-Agent Architecture
+
+Chat2DB deliberately uses a **single-pass Hybrid pipeline** rather than multiple specialized agents working in parallel. Here's the rationale:
+
+| Consideration | Single Agent (Chosen) | Multi-Agent Alternative |
+|---|---|---|
+| **Cost per query** | 1 LLM call (efficient) | 3–5 LLM calls (higher token usage) |
+| **Latency** | ~3–8s per query | ~8–15s (orchestration overhead) |
+| **Complexity** | Simple, maintainable | State sync, error handling, retries |
+| **Inference quality** | Hybrid context in one pass | Specialization benefit offset by latency |
+| **Debugging** | Single output to analyze | Multiple inter-agent dependencies |
+
+**Conclusion:** The Hybrid pipeline achieves performance goals (single LLM call combining RAG retrieval + TAG synthesis) without the cost and complexity overhead of a multi-agent system. For faster execution, we optimize through **client-side heuristics** (pre-analyze data before visualization LLM calls) and **lazy loading** (invoke vizAgent only when user views the Chart tab) — not additional agents.
+
 ---
 
 ## 8. System Architecture
