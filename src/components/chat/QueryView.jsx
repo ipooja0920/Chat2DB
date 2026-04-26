@@ -5,12 +5,20 @@ import ResultsTabs from "./ResultsTabs";
 import DataTable from "./DataTable";
 import FollowUpInput from "./FollowUpInput";
 import ChartView from "./ChartView";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy, Check, BookmarkPlus } from "lucide-react";
 import { exportQueryToPdf } from "@/lib/exportPdf";
 
-export default function QueryView({ queryData, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite }) {
+export default function QueryView({ queryData, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite, isSaved, onSaveQuery }) {
   const [resultsTab, setResultsTab] = useState("Results");
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopySql = () => {
+    if (!queryData?.sql_query) return;
+    navigator.clipboard.writeText(queryData.sql_query);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (loading) {
     return (
@@ -53,6 +61,27 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
           <pre className="bg-secondary rounded-xl p-4 text-sm font-mono text-foreground whitespace-pre-wrap border border-border">
             {queryData.sql_query || "No SQL generated"}
           </pre>
+          {/* SQL Action Buttons */}
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              onClick={handleCopySql}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-secondary hover:bg-muted border border-border rounded-lg transition-colors"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-muted-foreground" />}
+              {copied ? "Copied!" : "Copy SQL"}
+            </button>
+            <button
+              onClick={onSaveQuery}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
+                isSaved
+                  ? "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                  : "bg-secondary hover:bg-muted border-border text-foreground"
+              }`}
+            >
+              <BookmarkPlus className="w-4 h-4" />
+              {isSaved ? "Saved" : "Save Query"}
+            </button>
+          </div>
         </div>
       ) : resultsTab === "Explanation" ? (
         <div className="flex-1 p-6 overflow-auto">

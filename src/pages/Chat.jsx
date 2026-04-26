@@ -6,9 +6,11 @@ import QueryView from "@/components/chat/QueryView";
 import FollowUpInput from "@/components/chat/FollowUpInput";
 import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
+import SavedQueries from "@/pages/SavedQueries";
 import { sampleConversations } from "@/lib/sampleData";
 import { runQuery } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useSavedQueries } from "@/hooks/useSavedQueries";
 import { Menu } from "lucide-react";
 
 export default function Chat() {
@@ -19,6 +21,8 @@ export default function Chat() {
   const [overflowState, setOverflowState] = useState(null); // { queryData, oldest }
 
   const { favorites, isFavorite, addFavorite, confirmAdd, removeFavorite } = useFavorites();
+  const { savedQueries, isSaved, addSavedQuery, confirmAddSavedQuery, removeSavedQuery } = useSavedQueries();
+  const [savedOverflowState, setSavedOverflowState] = useState(null);
 
   // tabs: [{id, title}]
   const [tabs, setTabs] = useState([]);
@@ -115,10 +119,22 @@ export default function Chat() {
     setSidebarOpen(false);
   }, [queryResults, tabs, conversations]);
 
+  const handleToggleSavedQuery = useCallback((queryData) => {
+    if (isSaved(queryData.id)) {
+      removeSavedQuery(queryData.id);
+      return;
+    }
+    const result = addSavedQuery(queryData);
+    if (result?.needsConfirm) {
+      setSavedOverflowState({ queryData, oldest: result.oldest });
+    }
+  }, [isSaved, addSavedQuery, removeSavedQuery]);
+
   const currentResult = queryResults[activeTab];
   const isLoading = currentResult === "loading";
   const isDashboard = activeTab === "dashboard" || !currentResult;
   const isFavoritesPage = activePage === "Favorites";
+  const isSavedQueriesPage = activePage === "Saved Queries";
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
@@ -140,6 +156,7 @@ export default function Chat() {
           activePage={activePage}
           onNavigate={(page) => { setActivePage(page); setSidebarOpen(false); }}
           favoritesCount={favorites.length}
+          savedQueriesCount={savedQueries.length}
         />
       </div>
 
@@ -175,6 +192,15 @@ export default function Chat() {
               onSelectFavorite={(fav) => {
                 setActivePage("Dashboard");
                 handleSelectConversation(fav.id);
+              }}
+            />
+          ) : isSavedQueriesPage ? (
+            <SavedQueries
+              savedQueries={savedQueries}
+              onRemove={removeSavedQuery}
+              onSelectQuery={(item) => {
+                setActivePage("Dashboard");
+                handleSelectConversation(item.id);
               }}
             />
           ) : isDashboard ? (
@@ -220,17 +246,28 @@ export default function Chat() {
               llm={llm}
               isFavorite={!isLoading && currentResult ? isFavorite(currentResult.id) : false}
               onToggleFavorite={() => !isLoading && currentResult && handleToggleFavorite(currentResult)}
+              isSaved={!isLoading && currentResult ? isSaved(currentResult.id) : false}
+              onSaveQuery={() => !isLoading && currentResult && handleToggleSavedQuery(currentResult)}
             />
           )}
         </div>
       </div>
 
-      {/* Overflow confirmation dialog */}
+      {/* Favorites overflow dialog */}
       {overflowState && (
         <OverflowDialog
           oldest={overflowState.oldest}
           onConfirm={() => { confirmAdd(overflowState.queryData); setOverflowState(null); }}
           onCancel={() => setOverflowState(null)}
+        />
+      )}
+
+      {/* Saved Queries overflow dialog */}
+      {savedOverflowState && (
+        <OverflowDialog
+          oldest={savedOverflowState.oldest}
+          onConfirm={() => { confirmAddSavedQuery(savedOverflowState.queryData); setSavedOverflowState(null); }}
+          onCancel={() => setSavedOverflowState(null)}
         />
       )}
     </div>

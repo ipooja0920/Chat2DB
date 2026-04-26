@@ -2,11 +2,11 @@ import React from "react";
 import { Plus, LayoutDashboard, Database, BookmarkCheck, Star, Search, LogOut, MessageSquare, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function Sidebar({ conversations, activeConversation, onSelectConversation, onNewQuestion, activePage, onNavigate, favoritesCount }) {
+export default function Sidebar({ conversations, activeConversation, onSelectConversation, onNewQuestion, activePage, onNavigate, favoritesCount, savedQueriesCount }) {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard" },
     { icon: Database, label: "Explore Schema" },
-    { icon: BookmarkCheck, label: "Saved Queries" },
+    { icon: BookmarkCheck, label: "Saved Queries", badge: savedQueriesCount },
     { icon: Star, label: "Favorites", badge: favoritesCount },
   ];
   return (
