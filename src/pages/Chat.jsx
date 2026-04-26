@@ -7,7 +7,6 @@ import FollowUpInput from "@/components/chat/FollowUpInput";
 import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
 import SavedQueries from "@/pages/SavedQueries";
-// sampleConversations removed — using real history only
 import { runQuery } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
@@ -18,27 +17,30 @@ export default function Chat() {
   const [llm, setLlm] = useState("OpenAI");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState("Dashboard");
-  const [overflowState, setOverflowState] = useState(null); // { queryData, oldest }
+  const [overflowState, setOverflowState] = useState(null);
 
   const { favorites, isFavorite, addFavorite, confirmAdd, removeFavorite } = useFavorites();
   const { savedQueries, isSaved, addSavedQuery, confirmAddSavedQuery, removeSavedQuery } = useSavedQueries();
   const [savedOverflowState, setSavedOverflowState] = useState(null);
 
-  // tabs: [{id, title}]
+  // tabs: [{ id, title }]
   const [tabs, setTabs] = useState([]);
   const [activeTab, setActiveTab] = useState("dashboard");
 
-  // queryResults: { [tabId]: { question, ...llmResponse } | "loading" }
+  // queryResults: { [tabId]: Message[] }
+  // Each Message: { id, question, ...llmResponse } | { _loading: true, question }
   const [queryResults, setQueryResults] = useState({});
 
-  // conversation history for sidebar — last 5, deduplicated
+  // conversations: last 5 entries, each owns a thread snapshot
+  // { id, title, time, thread: Message[] }
   const [conversations, setConversations] = useState([]);
 
-  // Add/move-to-top a conversation entry, capped at 5
-  const pushConversation = useCallback((id, title) => {
+  // Push a conversation entry with the current thread snapshot (up to this message)
+  // id is unique per entry so follow-ups get their own entry
+  const pushConversation = useCallback((id, title, threadSnapshot) => {
     setConversations((prev) => {
       const filtered = prev.filter((c) => c.id !== id);
-      return [{ id, title, time: "just now" }, ...filtered].slice(0, 5);
+      return [{ id, title, time: "just now", thread: threadSnapshot }, ...filtered].slice(0, 5);
     });
   }, []);
 
@@ -50,20 +52,22 @@ export default function Chat() {
     });
   }, []);
 
-  const runQueryInTab = useCallback(async (question, tabId, isFollowUp = false) => {
+  const runQueryInTab = useCallback(async (question, tabId, onComplete) => {
     appendLoadingMessage(tabId, question);
     try {
       const result = await runQuery(question, mode, llm);
-      const message = { id: isFollowUp ? `${tabId}-${Date.now()}` : tabId, question, ...result };
+      const message = { id: `${tabId}-${Date.now()}`, question, ...result };
       setQueryResults((prev) => {
         const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
-        // Replace the last loading placeholder with the real result
         const without = existing.filter((m) => !m._loading);
-        return { ...prev, [tabId]: [...without, message] };
+        const newThread = [...without, message];
+        // Notify caller with final thread so they can snapshot it
+        onComplete?.(newThread, message);
+        return { ...prev, [tabId]: newThread };
       });
     } catch (err) {
       const message = {
-        id: isFollowUp ? `${tabId}-${Date.now()}` : tabId,
+        id: `${tabId}-${Date.now()}`,
         question,
         intent: "Error",
         pipeline: mode === "Hybrid" ? "Hybrid (RAG + TAG)" : "Standard (RAG)",
@@ -76,29 +80,35 @@ export default function Chat() {
       setQueryResults((prev) => {
         const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
         const without = existing.filter((m) => !m._loading);
-        return { ...prev, [tabId]: [...without, message] };
+        const newThread = [...without, message];
+        onComplete?.(newThread, message);
+        return { ...prev, [tabId]: newThread };
       });
     }
   }, [mode, llm, appendLoadingMessage]);
 
-  // New question — always opens a new tab
+  // New question — always opens a new tab; history entry gets snapshot after answer arrives
   const handleAskQuestion = useCallback(async (question) => {
-    const id = Date.now().toString();
-    setTabs((prev) => [...prev, { id, title: question }]);
-    setActiveTab(id);
-    pushConversation(id, question);
-    await runQueryInTab(question, id, false);
+    const tabId = Date.now().toString();
+    setTabs((prev) => [...prev, { id: tabId, title: question }]);
+    setActiveTab(tabId);
+    await runQueryInTab(question, tabId, (newThread) => {
+      // Snapshot = just this first message
+      pushConversation(tabId, question, newThread.slice(0, 1));
+    });
   }, [runQueryInTab, pushConversation]);
 
-  // Follow-up — appends to current tab's thread; keeps original tab title & history entry
+  // Follow-up — appends to current tab's thread; each follow-up gets its own history entry
   const handleFollowUp = useCallback(async (question) => {
     if (activeTab === "dashboard") {
       await handleAskQuestion(question);
       return;
     }
-    // Push follow-up to history as its own entry (if within top 5)
-    pushConversation(`${activeTab}-fu-${Date.now()}`, question);
-    await runQueryInTab(question, activeTab, true);
+    const convId = `${activeTab}-fu-${Date.now()}`;
+    await runQueryInTab(question, activeTab, (newThread) => {
+      // Snapshot = everything up to and including this answer
+      pushConversation(convId, question, [...newThread]);
+    });
   }, [activeTab, runQueryInTab, handleAskQuestion, pushConversation]);
 
   const handleCloseTab = useCallback((id) => {
@@ -109,6 +119,8 @@ export default function Chat() {
       }
       return next;
     });
+    // Don't delete queryResults[id] — history entries may still reference snapshots
+    // But we do clean up tabs that are purely "virtual" (from history) when closed
     setQueryResults((prev) => {
       const copy = { ...prev };
       delete copy[id];
@@ -131,24 +143,26 @@ export default function Chat() {
     }
   }, [isFavorite, addFavorite, removeFavorite]);
 
+  // Clicking a conversation history entry: load its snapshot into a virtual tab
   const handleSelectConversation = useCallback((convId) => {
-    const result = queryResults[convId];
-    if (!result || (Array.isArray(result) && result.length === 0)) { setSidebarOpen(false); return; }
-
-    // Open tab if not already open
-    if (!tabs.find((t) => t.id === convId)) {
-      const conv = conversations.find((c) => c.id === convId);
-      setTabs((prev) => [...prev, { id: convId, title: conv?.title || "Query" }]);
-    }
-    setActiveTab(convId);
-    setActivePage("Dashboard");
-
-    // Move to top of history (dedup)
     const conv = conversations.find((c) => c.id === convId);
-    if (conv) pushConversation(convId, conv.title);
+    if (!conv || !conv.thread?.length) { setSidebarOpen(false); return; }
 
+    // Use the conv's own unique id as the virtual tab id
+    const virtualTabId = convId;
+
+    // Inject thread snapshot into queryResults so QueryView can render it
+    setQueryResults((prev) => ({ ...prev, [virtualTabId]: conv.thread }));
+
+    // Open a tab for it if not already open
+    if (!tabs.find((t) => t.id === virtualTabId)) {
+      setTabs((prev) => [...prev, { id: virtualTabId, title: conv.title }]);
+    }
+
+    setActiveTab(virtualTabId);
+    setActivePage("Dashboard");
     setSidebarOpen(false);
-  }, [queryResults, tabs, conversations, pushConversation]);
+  }, [conversations, tabs]);
 
   const handleToggleSavedQuery = useCallback((queryData) => {
     if (isSaved(queryData.id)) {
@@ -251,7 +265,6 @@ export default function Chat() {
               <div className="w-full max-w-lg">
                 <FollowUpInput onSend={handleAskQuestion} placeholder="e.g. What is the total revenue by country?" />
               </div>
-              {/* Example questions */}
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                 {[
                   "What is the total revenue by country?",
