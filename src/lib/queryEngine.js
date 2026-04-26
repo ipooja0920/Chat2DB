@@ -1,28 +1,78 @@
 import { base44 } from "@/api/base44Client";
 
-/**
- * Replicates the RAG pipeline logic from the GitHub repo:
- * - RAG: uses vector/doc context to generate SQL, then executes and explains
- * - TAG: Table-Augmented Generation - synthesize SQL → execute → generate answer
- * - Hybrid: runs both and combines the best answer
- *
- * Since we're in a browser (no Python backend), we use InvokeLLM with 
- * carefully crafted prompts that mirror the original pipeline behavior.
- */
-
 const MODEL_MAP = {
-  OpenAI: "gpt_5",        // maps to gpt-4 equivalent
-  Claude: "claude_sonnet_4_6",  // maps to claude-3-5-sonnet
+  OpenAI: "gpt_5",
+  Claude: "claude_sonnet_4_6",
 };
 
-/**
- * RAG Pipeline: Retrieval-Augmented Generation
- * Generates SQL using schema context, then provides a natural language answer.
- */
+// ─── Database Schemas ────────────────────────────────────────────────────────
+
+const CHINOOK_SCHEMA = `
+Database: Chinook (Digital Music Store)
+CREATE TABLE Artist (ArtistId INTEGER PRIMARY KEY, Name NVARCHAR(120));
+CREATE TABLE Album (AlbumId INTEGER PRIMARY KEY, Title NVARCHAR(160), ArtistId INTEGER REFERENCES Artist(ArtistId));
+CREATE TABLE Genre (GenreId INTEGER PRIMARY KEY, Name NVARCHAR(120));
+CREATE TABLE MediaType (MediaTypeId INTEGER PRIMARY KEY, Name NVARCHAR(120));
+CREATE TABLE Track (TrackId INTEGER PRIMARY KEY, Name NVARCHAR(200), AlbumId INTEGER REFERENCES Album(AlbumId), MediaTypeId INTEGER REFERENCES MediaType(MediaTypeId), GenreId INTEGER REFERENCES Genre(GenreId), Composer NVARCHAR(220), Milliseconds INTEGER, Bytes INTEGER, UnitPrice NUMERIC(10,2));
+CREATE TABLE Playlist (PlaylistId INTEGER PRIMARY KEY, Name NVARCHAR(120));
+CREATE TABLE PlaylistTrack (PlaylistId INTEGER REFERENCES Playlist(PlaylistId), TrackId INTEGER REFERENCES Track(TrackId));
+CREATE TABLE Employee (EmployeeId INTEGER PRIMARY KEY, LastName NVARCHAR(20), FirstName NVARCHAR(20), Title NVARCHAR(30), ReportsTo INTEGER REFERENCES Employee(EmployeeId), BirthDate DATETIME, HireDate DATETIME, Address NVARCHAR(70), City NVARCHAR(40), State NVARCHAR(40), Country NVARCHAR(40), PostalCode NVARCHAR(10), Phone NVARCHAR(24), Fax NVARCHAR(24), Email NVARCHAR(60));
+CREATE TABLE Customer (CustomerId INTEGER PRIMARY KEY, FirstName NVARCHAR(40), LastName NVARCHAR(20), Company NVARCHAR(80), Address NVARCHAR(70), City NVARCHAR(40), State NVARCHAR(40), Country NVARCHAR(40), PostalCode NVARCHAR(10), Phone NVARCHAR(24), Fax NVARCHAR(24), Email NVARCHAR(60), SupportRepId INTEGER REFERENCES Employee(EmployeeId));
+CREATE TABLE Invoice (InvoiceId INTEGER PRIMARY KEY, CustomerId INTEGER REFERENCES Customer(CustomerId), InvoiceDate DATETIME, BillingAddress NVARCHAR(70), BillingCity NVARCHAR(40), BillingState NVARCHAR(40), BillingCountry NVARCHAR(40), BillingPostalCode NVARCHAR(10), Total NUMERIC(10,2));
+CREATE TABLE InvoiceLine (InvoiceLineId INTEGER PRIMARY KEY, InvoiceId INTEGER REFERENCES Invoice(InvoiceId), TrackId INTEGER REFERENCES Track(TrackId), UnitPrice NUMERIC(10,2), Quantity INTEGER);
+`;
+
+const NORTHWIND_SCHEMA = `
+Database: Northwind (Trading Company)
+CREATE TABLE Categories (CategoryID INTEGER PRIMARY KEY, CategoryName NVARCHAR(15), Description NTEXT, Picture IMAGE);
+CREATE TABLE Suppliers (SupplierID INTEGER PRIMARY KEY, CompanyName NVARCHAR(40), ContactName NVARCHAR(30), ContactTitle NVARCHAR(30), Address NVARCHAR(60), City NVARCHAR(15), Region NVARCHAR(15), PostalCode NVARCHAR(10), Country NVARCHAR(15), Phone NVARCHAR(24), Fax NVARCHAR(24), HomePage NTEXT);
+CREATE TABLE Products (ProductID INTEGER PRIMARY KEY, ProductName NVARCHAR(40), SupplierID INTEGER REFERENCES Suppliers(SupplierID), CategoryID INTEGER REFERENCES Categories(CategoryID), QuantityPerUnit NVARCHAR(20), UnitPrice MONEY, UnitsInStock SMALLINT, UnitsOnOrder SMALLINT, ReorderLevel SMALLINT, Discontinued BIT);
+CREATE TABLE Shippers (ShipperID INTEGER PRIMARY KEY, CompanyName NVARCHAR(40), Phone NVARCHAR(24));
+CREATE TABLE Customers (CustomerID NCHAR(5) PRIMARY KEY, CompanyName NVARCHAR(40), ContactName NVARCHAR(30), ContactTitle NVARCHAR(30), Address NVARCHAR(60), City NVARCHAR(15), Region NVARCHAR(15), PostalCode NVARCHAR(10), Country NVARCHAR(15), Phone NVARCHAR(24), Fax NVARCHAR(24));
+CREATE TABLE Employees (EmployeeID INTEGER PRIMARY KEY, LastName NVARCHAR(20), FirstName NVARCHAR(10), Title NVARCHAR(30), TitleOfCourtesy NVARCHAR(25), BirthDate DATETIME, HireDate DATETIME, Address NVARCHAR(60), City NVARCHAR(15), Region NVARCHAR(15), PostalCode NVARCHAR(10), Country NVARCHAR(15), HomePhone NVARCHAR(24), Extension NVARCHAR(4), ReportsTo INTEGER REFERENCES Employees(EmployeeID));
+CREATE TABLE Orders (OrderID INTEGER PRIMARY KEY, CustomerID NCHAR(5) REFERENCES Customers(CustomerID), EmployeeID INTEGER REFERENCES Employees(EmployeeID), OrderDate DATETIME, RequiredDate DATETIME, ShippedDate DATETIME, ShipVia INTEGER REFERENCES Shippers(ShipperID), Freight MONEY, ShipName NVARCHAR(40), ShipAddress NVARCHAR(60), ShipCity NVARCHAR(15), ShipRegion NVARCHAR(15), ShipPostalCode NVARCHAR(10), ShipCountry NVARCHAR(15));
+CREATE TABLE OrderDetails (OrderID INTEGER REFERENCES Orders(OrderID), ProductID INTEGER REFERENCES Products(ProductID), UnitPrice MONEY, Quantity SMALLINT, Discount REAL, PRIMARY KEY (OrderID, ProductID));
+CREATE TABLE Region (RegionID INTEGER PRIMARY KEY, RegionDescription NCHAR(50));
+CREATE TABLE Territories (TerritoryID NVARCHAR(20) PRIMARY KEY, TerritoryDescription NCHAR(50), RegionID INTEGER REFERENCES Region(RegionID));
+CREATE TABLE EmployeeTerritories (EmployeeID INTEGER REFERENCES Employees(EmployeeID), TerritoryID NVARCHAR(20) REFERENCES Territories(TerritoryID), PRIMARY KEY (EmployeeID, TerritoryID));
+`;
+
+export const DATABASES = [
+  {
+    id: "chinook",
+    label: "Chinook DB",
+    description: "Digital music store",
+    schema: CHINOOK_SCHEMA,
+    sampleQuestions: [
+      "What is the total revenue by country?",
+      "Top 10 customers by spend",
+      "Best selling genres",
+      "Monthly revenue trend",
+    ],
+  },
+  {
+    id: "northwind",
+    label: "Northwind DB",
+    description: "Trading company",
+    schema: NORTHWIND_SCHEMA,
+    sampleQuestions: [
+      "Top selling products by revenue",
+      "Which customers have the most orders?",
+      "Revenue by country",
+      "Most popular product categories",
+    ],
+  },
+];
+
+export function getDatabaseById(id) {
+  return DATABASES.find((db) => db.id === id) || DATABASES[0];
+}
+
+// ─── Pipelines ────────────────────────────────────────────────────────────────
+
 async function ragPipeline(question, llmProvider, dbSchema) {
   const model = MODEL_MAP[llmProvider];
 
-  // Step 1: Generate SQL from natural language (RAG style - schema as context)
   const sqlResponse = await base44.integrations.Core.InvokeLLM({
     model,
     prompt: `You are a SQL expert. Using the database schema below as context, generate a precise SQL SELECT query to answer the user's question.
@@ -46,7 +96,6 @@ Rules:
     },
   });
 
-  // Step 2: Execute the SQL conceptually and generate answer with results
   const answerResponse = await base44.integrations.Core.InvokeLLM({
     model,
     prompt: `You are a database analyst. The user asked: "${question}"
@@ -56,18 +105,16 @@ ${sqlResponse.sql_query}
 
 Relevant tables used: ${(sqlResponse.relevant_tables || []).join(", ")}
 
-Now provide:
-1. A natural language explanation of the query and what results it would return
-2. Sample/estimated results in a structured table format based on what this query would realistically return from a Chinook music database (artists, albums, tracks, invoices, customers, employees)
-3. Key insights from the results
+Now provide a complete response based on the following database schema:
+${dbSchema}
 
-Format your response as JSON with these fields:
-- summary: a 1-2 sentence answer written in plain business English — no SQL terms, no technical jargon, just a clear and direct insight a business user would understand
+Format your response as JSON:
+- summary: a 1-2 sentence answer in plain business English
 - intent: classify as one of "Analytical", "Lookup", "Aggregation", "Ranking", "Filter", "Trend"
 - sql_query: the SQL query
 - explanation: 2-3 sentences explaining what the query does
 - columns: array of {key, label} objects for the result table
-- rows: array of result objects (5-15 realistic rows)
+- rows: array of result objects (5-15 realistic rows consistent with this database)
 - stats: array of up to 4 key metrics, each with {label, value, icon, color} where icon is one of "dollar","globe","trending","clock","users","layers" and color is one of "purple","blue","green","orange"`,
     response_json_schema: {
       type: "object",
@@ -90,19 +137,14 @@ Format your response as JSON with these fields:
   };
 }
 
-/**
- * TAG Pipeline: Table-Augmented Generation
- * Mirrors the TAGWorkflow: query_synthesis → query_execution → answer_generation
- */
 async function tagPipeline(question, llmProvider, dbSchema) {
   const model = MODEL_MAP[llmProvider];
 
-  // Step 1: Query Synthesis (mirrors TAGWorkflow.query_synthesis)
   const synthesis = await base44.integrations.Core.InvokeLLM({
     model,
-    prompt: `You are a SQL synthesis engine (TAG - Table Augmented Generation). Your job is to deeply analyze the database schema and synthesize the most optimal SQL query.
+    prompt: `You are a SQL synthesis engine (TAG - Table Augmented Generation).
 
-Database Schema (Chinook):
+Database Schema:
 ${dbSchema}
 
 User Question: ${question}
@@ -128,23 +170,23 @@ Return JSON with:
     },
   });
 
-  // Step 2 & 3: Query Execution + Answer Generation (mirrors query_execution + answer_generation)
   const answer = await base44.integrations.Core.InvokeLLM({
     model,
-    prompt: `You are a database answer generator (TAG pipeline - answer_generation step).
+    prompt: `You are a database answer generator (TAG pipeline).
 
 Original Question: "${question}"
 SQL Query Synthesized: ${synthesis.sql_query}
 Tables Used: ${(synthesis.relevant_tables || []).join(", ")}
 Query Plan: ${synthesis.query_plan}
 
-Generate a complete analytical response as if you executed this query against the Chinook music database. The Chinook database contains: customers, invoices, invoice_items, tracks, albums, artists, genres, media_types, playlists, employees.
+Database Schema:
+${dbSchema}
 
-Provide realistic query results and insights.
+Generate a complete analytical response as if you executed this query against the database above. Provide realistic query results and insights consistent with this specific database.
 
 Return JSON:
 - summary: one-line direct answer to the question
-- intent: one of "Analytical", "Lookup", "Aggregation", "Ranking", "Filter", "Trend"  
+- intent: one of "Analytical", "Lookup", "Aggregation", "Ranking", "Filter", "Trend"
 - sql_query: the final SQL
 - explanation: 2-3 sentences explaining the approach and findings
 - columns: array of {key, label} for the result columns
@@ -171,10 +213,6 @@ Return JSON:
   };
 }
 
-/**
- * Hybrid Pipeline: RAG + TAG combined
- * Runs TAG (more thorough) and uses RAG context for enrichment
- */
 async function hybridPipeline(question, llmProvider, dbSchema) {
   const model = MODEL_MAP[llmProvider];
 
@@ -184,10 +222,8 @@ async function hybridPipeline(question, llmProvider, dbSchema) {
 1. RAG (Retrieval-Augmented Generation): Use schema metadata and documentation context
 2. TAG (Table-Augmented Generation): Synthesize SQL by deeply analyzing table structures
 
-Database Schema (Chinook - music store):
+Database Schema:
 ${dbSchema}
-
-Tables available: Customer, Invoice, InvoiceLine, Track, Album, Artist, Genre, MediaType, Playlist, PlaylistTrack, Employee
 
 User Question: "${question}"
 
@@ -195,6 +231,8 @@ Hybrid approach:
 - RAG phase: retrieve relevant schema context, identify intent and domain
 - TAG phase: synthesize optimal SQL using table augmentation
 - Combine: produce the most accurate and comprehensive answer
+
+IMPORTANT: All results, data, and insights must be consistent with the database schema provided above. Do not mix data from other databases.
 
 Return complete JSON:
 - summary: direct one-line answer
@@ -206,7 +244,7 @@ Return complete JSON:
 - stats: array of 2-4 highlight metrics each with {label, value, icon, color}
   - icon must be one of: "dollar", "globe", "trending", "clock", "users", "layers"
   - color must be one of: "purple", "blue", "green", "orange"
-- sources_count: number of schema sources referenced (e.g. 8)
+- sources_count: number of schema sources referenced
 - tables_count: number of tables involved`,
     response_json_schema: {
       type: "object",
@@ -230,26 +268,14 @@ Return complete JSON:
   };
 }
 
-// Default Chinook DB schema context (mirrors what would be in the vector store)
-const CHINOOK_SCHEMA = `
-CREATE TABLE Artist (ArtistId INTEGER PRIMARY KEY, Name NVARCHAR(120));
-CREATE TABLE Album (AlbumId INTEGER PRIMARY KEY, Title NVARCHAR(160), ArtistId INTEGER REFERENCES Artist(ArtistId));
-CREATE TABLE Genre (GenreId INTEGER PRIMARY KEY, Name NVARCHAR(120));
-CREATE TABLE MediaType (MediaTypeId INTEGER PRIMARY KEY, Name NVARCHAR(120));
-CREATE TABLE Track (TrackId INTEGER PRIMARY KEY, Name NVARCHAR(200), AlbumId INTEGER REFERENCES Album(AlbumId), MediaTypeId INTEGER REFERENCES MediaType(MediaTypeId), GenreId INTEGER REFERENCES Genre(GenreId), Composer NVARCHAR(220), Milliseconds INTEGER, Bytes INTEGER, UnitPrice NUMERIC(10,2));
-CREATE TABLE Playlist (PlaylistId INTEGER PRIMARY KEY, Name NVARCHAR(120));
-CREATE TABLE PlaylistTrack (PlaylistId INTEGER REFERENCES Playlist(PlaylistId), TrackId INTEGER REFERENCES Track(TrackId));
-CREATE TABLE Employee (EmployeeId INTEGER PRIMARY KEY, LastName NVARCHAR(20), FirstName NVARCHAR(20), Title NVARCHAR(30), ReportsTo INTEGER REFERENCES Employee(EmployeeId), BirthDate DATETIME, HireDate DATETIME, Address NVARCHAR(70), City NVARCHAR(40), State NVARCHAR(40), Country NVARCHAR(40), PostalCode NVARCHAR(10), Phone NVARCHAR(24), Fax NVARCHAR(24), Email NVARCHAR(60));
-CREATE TABLE Customer (CustomerId INTEGER PRIMARY KEY, FirstName NVARCHAR(40), LastName NVARCHAR(20), Company NVARCHAR(80), Address NVARCHAR(70), City NVARCHAR(40), State NVARCHAR(40), Country NVARCHAR(40), PostalCode NVARCHAR(10), Phone NVARCHAR(24), Fax NVARCHAR(24), Email NVARCHAR(60), SupportRepId INTEGER REFERENCES Employee(EmployeeId));
-CREATE TABLE Invoice (InvoiceId INTEGER PRIMARY KEY, CustomerId INTEGER REFERENCES Customer(CustomerId), InvoiceDate DATETIME, BillingAddress NVARCHAR(70), BillingCity NVARCHAR(40), BillingState NVARCHAR(40), BillingCountry NVARCHAR(40), BillingPostalCode NVARCHAR(10), Total NUMERIC(10,2));
-CREATE TABLE InvoiceLine (InvoiceLineId INTEGER PRIMARY KEY, InvoiceId INTEGER REFERENCES Invoice(InvoiceId), TrackId INTEGER REFERENCES Track(TrackId), UnitPrice NUMERIC(10,2), Quantity INTEGER);
-`;
+// ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function runQuery(question, mode, llmProvider) {
-  if (mode === "Hybrid") {
-    return hybridPipeline(question, llmProvider, CHINOOK_SCHEMA);
-  } else if (mode === "Standard") {
-    return ragPipeline(question, llmProvider, CHINOOK_SCHEMA);
+export async function runQuery(question, mode, llmProvider, databaseId = "chinook") {
+  const db = getDatabaseById(databaseId);
+  const schema = db.schema;
+
+  if (mode === "Standard") {
+    return ragPipeline(question, llmProvider, schema);
   }
-  return hybridPipeline(question, llmProvider, CHINOOK_SCHEMA);
+  return hybridPipeline(question, llmProvider, schema);
 }

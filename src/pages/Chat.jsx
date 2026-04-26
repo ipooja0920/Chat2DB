@@ -7,7 +7,7 @@ import FollowUpInput from "@/components/chat/FollowUpInput";
 import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
 import SavedQueries from "@/pages/SavedQueries";
-import { runQuery } from "@/lib/queryEngine";
+import { runQuery, getDatabaseById, DATABASES } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
 import { Menu } from "lucide-react";
@@ -15,6 +15,7 @@ import { Menu } from "lucide-react";
 export default function Chat() {
   const [mode, setMode] = useState("Hybrid");
   const [llm, setLlm] = useState("OpenAI");
+  const [database, setDatabase] = useState("chinook");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePage, setActivePage] = useState("Dashboard");
   const [overflowState, setOverflowState] = useState(null);
@@ -52,10 +53,19 @@ export default function Chat() {
     });
   }, []);
 
+  // When the user switches DB: clear all tabs, results, and conversations
+  const handleDatabaseChange = useCallback((newDb) => {
+    setDatabase(newDb);
+    setTabs([]);
+    setActiveTab("dashboard");
+    setQueryResults({});
+    setConversations([]);
+  }, []);
+
   const runQueryInTab = useCallback(async (question, tabId, onComplete) => {
     appendLoadingMessage(tabId, question);
     try {
-      const result = await runQuery(question, mode, llm);
+      const result = await runQuery(question, mode, llm, database);
       const message = { id: `${tabId}-${Date.now()}`, question, ...result };
       setQueryResults((prev) => {
         const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
@@ -219,6 +229,8 @@ export default function Chat() {
           onModeChange={setMode}
           llm={llm}
           onLlmChange={setLlm}
+          database={database}
+          onDatabaseChange={handleDatabaseChange}
         />
 
         <QueryTabs
@@ -263,15 +275,10 @@ export default function Chat() {
                 </p>
               </div>
               <div className="w-full max-w-lg">
-                <FollowUpInput onSend={handleAskQuestion} placeholder="e.g. What is the total revenue by country?" />
+                <FollowUpInput onSend={handleAskQuestion} placeholder={`Ask a question about ${getDatabaseById(database).label}...`} />
               </div>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                {[
-                  "What is the total revenue by country?",
-                  "Top 10 customers by spend",
-                  "Best selling genres",
-                  "Monthly revenue trend",
-                ].map((q) => (
+                {getDatabaseById(database).sampleQuestions.map((q) => (
                   <button
                     key={q}
                     onClick={() => handleAskQuestion(q)}
