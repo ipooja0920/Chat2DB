@@ -42,31 +42,44 @@ export default function Chat() {
     });
   }, []);
 
-  const runQueryInTab = useCallback(async (question, tabId) => {
-    setQueryResults((prev) => ({ ...prev, [tabId]: "loading" }));
+  // Append a loading placeholder for a new message in a tab's thread
+  const appendLoadingMessage = useCallback((tabId, question) => {
+    setQueryResults((prev) => {
+      const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
+      return { ...prev, [tabId]: [...existing, { _loading: true, question }] };
+    });
+  }, []);
+
+  const runQueryInTab = useCallback(async (question, tabId, isFollowUp = false) => {
+    appendLoadingMessage(tabId, question);
     try {
       const result = await runQuery(question, mode, llm);
-      setQueryResults((prev) => ({
-        ...prev,
-        [tabId]: { id: tabId, question, ...result },
-      }));
+      const message = { id: isFollowUp ? `${tabId}-${Date.now()}` : tabId, question, ...result };
+      setQueryResults((prev) => {
+        const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
+        // Replace the last loading placeholder with the real result
+        const without = existing.filter((m) => !m._loading);
+        return { ...prev, [tabId]: [...without, message] };
+      });
     } catch (err) {
-      setQueryResults((prev) => ({
-        ...prev,
-        [tabId]: {
-          id: tabId,
-          question,
-          intent: "Error",
-          pipeline: mode === "Hybrid" ? "Hybrid (RAG + TAG)" : "Standard (RAG)",
-          sql_query: "",
-          explanation: `Error: ${err.message}`,
-          columns: [],
-          rows: [],
-          stats: [],
-        },
-      }));
+      const message = {
+        id: isFollowUp ? `${tabId}-${Date.now()}` : tabId,
+        question,
+        intent: "Error",
+        pipeline: mode === "Hybrid" ? "Hybrid (RAG + TAG)" : "Standard (RAG)",
+        sql_query: "",
+        explanation: `Error: ${err.message}`,
+        columns: [],
+        rows: [],
+        stats: [],
+      };
+      setQueryResults((prev) => {
+        const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
+        const without = existing.filter((m) => !m._loading);
+        return { ...prev, [tabId]: [...without, message] };
+      });
     }
-  }, [mode, llm]);
+  }, [mode, llm, appendLoadingMessage]);
 
   // New question — always opens a new tab
   const handleAskQuestion = useCallback(async (question) => {
@@ -74,18 +87,18 @@ export default function Chat() {
     setTabs((prev) => [...prev, { id, title: question }]);
     setActiveTab(id);
     pushConversation(id, question);
-    await runQueryInTab(question, id);
+    await runQueryInTab(question, id, false);
   }, [runQueryInTab, pushConversation]);
 
-  // Follow-up — updates the current tab in place
+  // Follow-up — appends to current tab's thread; keeps original tab title & history entry
   const handleFollowUp = useCallback(async (question) => {
     if (activeTab === "dashboard") {
       await handleAskQuestion(question);
       return;
     }
-    setTabs((prev) => prev.map((t) => t.id === activeTab ? { ...t, title: question } : t));
-    pushConversation(activeTab, question);
-    await runQueryInTab(question, activeTab);
+    // Push follow-up to history as its own entry (if within top 5)
+    pushConversation(`${activeTab}-fu-${Date.now()}`, question);
+    await runQueryInTab(question, activeTab, true);
   }, [activeTab, runQueryInTab, handleAskQuestion, pushConversation]);
 
   const handleCloseTab = useCallback((id) => {
@@ -120,7 +133,7 @@ export default function Chat() {
 
   const handleSelectConversation = useCallback((convId) => {
     const result = queryResults[convId];
-    if (!result) { setSidebarOpen(false); return; }
+    if (!result || (Array.isArray(result) && result.length === 0)) { setSidebarOpen(false); return; }
 
     // Open tab if not already open
     if (!tabs.find((t) => t.id === convId)) {
@@ -148,9 +161,10 @@ export default function Chat() {
     }
   }, [isSaved, addSavedQuery, removeSavedQuery]);
 
-  const currentResult = queryResults[activeTab];
-  const isLoading = currentResult === "loading";
-  const isDashboard = activeTab === "dashboard" || !currentResult;
+  const currentThread = Array.isArray(queryResults[activeTab]) ? queryResults[activeTab] : [];
+  const isThreadLoading = currentThread.length > 0 && currentThread[currentThread.length - 1]?._loading;
+  const lastResult = currentThread.filter((m) => !m._loading).slice(-1)[0] || null;
+  const isDashboard = activeTab === "dashboard" || currentThread.length === 0;
   const isFavoritesPage = activePage === "Favorites";
   const isSavedQueriesPage = activePage === "Saved Queries";
 
@@ -257,15 +271,15 @@ export default function Chat() {
             </div>
           ) : (
             <QueryView
-              queryData={isLoading ? null : currentResult}
-              loading={isLoading}
+              thread={currentThread}
+              loading={isThreadLoading}
               onFollowUp={handleFollowUp}
               mode={mode}
               llm={llm}
-              isFavorite={!isLoading && currentResult ? isFavorite(currentResult.id) : false}
-              onToggleFavorite={() => !isLoading && currentResult && handleToggleFavorite(currentResult)}
-              isSaved={!isLoading && currentResult ? isSaved(currentResult.id) : false}
-              onSaveQuery={() => !isLoading && currentResult && handleToggleSavedQuery(currentResult)}
+              isFavorite={lastResult ? isFavorite(lastResult.id) : false}
+              onToggleFavorite={() => lastResult && handleToggleFavorite(lastResult)}
+              isSaved={lastResult ? isSaved(lastResult.id) : false}
+              onSaveQuery={() => lastResult && handleToggleSavedQuery(lastResult)}
             />
           )}
         </div>

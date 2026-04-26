@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import QuestionHeader from "./QuestionHeader";
 import StatsCards from "./StatsCards";
 import ResultsTabs from "./ResultsTabs";
@@ -8,7 +8,7 @@ import ChartView from "./ChartView";
 import { Loader2, Copy, Check, BookmarkPlus } from "lucide-react";
 import { exportQueryToPdf } from "@/lib/exportPdf";
 
-export default function QueryView({ queryData, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite, isSaved, onSaveQuery }) {
+function MessageBlock({ queryData, isFavorite, onToggleFavorite, isSaved, onSaveQuery, isLast }) {
   const [resultsTab, setResultsTab] = useState("Results");
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -20,48 +20,20 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        </div>
-        <div className="text-center">
-          <p className="text-sm font-medium text-foreground">Processing your question...</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Running {mode} pipeline with {llm}
-          </p>
-        </div>
-        <FollowUpInput onSend={onFollowUp} disabled />
-      </div>
-    );
-  }
-
-  if (!queryData) return null;
-
   const now = new Date();
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const tabContent = (
     <>
       {resultsTab === "Results" && queryData.rows?.length > 0 ? (
-        <DataTable
-          columns={queryData.columns || []}
-          data={queryData.rows || []}
-          totalLabel="rows"
-        />
+        <DataTable columns={queryData.columns || []} data={queryData.rows || []} totalLabel="rows" />
       ) : resultsTab === "Chart" ? (
-        <ChartView
-          question={queryData.question}
-          columns={queryData.columns || []}
-          rows={queryData.rows || []}
-        />
+        <ChartView question={queryData.question} columns={queryData.columns || []} rows={queryData.rows || []} />
       ) : resultsTab === "SQL" ? (
         <div className="flex-1 p-6 overflow-auto">
           <pre className="bg-secondary rounded-xl p-4 text-sm font-mono text-foreground whitespace-pre-wrap border border-border">
             {queryData.sql_query || "No SQL generated"}
           </pre>
-          {/* SQL Action Buttons */}
           <div className="flex items-center gap-3 mt-3">
             <button
               onClick={handleCopySql}
@@ -95,7 +67,6 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
     </>
   );
 
-  // Expanded: full-screen overlay
   if (expanded) {
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col">
@@ -106,15 +77,13 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
           onToggleExpand={() => setExpanded(false)}
           expanded={true}
         />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {tabContent}
-        </div>
+        <div className="flex-1 flex flex-col overflow-hidden">{tabContent}</div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className={`${!isLast ? "border-b border-border pb-2 mb-2" : ""}`}>
       <QuestionHeader
         question={queryData.question}
         time={time}
@@ -129,8 +98,6 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
         onToggleFavorite={onToggleFavorite}
       />
       <StatsCards stats={queryData.stats} />
-
-      {/* Written answer summary */}
       {queryData.summary && (
         <div className="px-6 pb-4">
           <p className="text-sm text-foreground leading-relaxed bg-accent/40 border border-accent rounded-xl px-4 py-3">
@@ -138,7 +105,6 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
           </p>
         </div>
       )}
-
       <ResultsTabs
         activeTab={resultsTab}
         onTabChange={setResultsTab}
@@ -147,7 +113,55 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm, i
         expanded={false}
       />
       {tabContent}
-      <FollowUpInput onSend={onFollowUp} />
-    </>
+    </div>
+  );
+}
+
+export default function QueryView({ thread, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite, isSaved, onSaveQuery }) {
+  const bottomRef = useRef(null);
+  const completedMessages = thread.filter((m) => !m._loading);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [thread.length]);
+
+  if (thread.length === 0 && !loading) return null;
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        {completedMessages.map((msg, idx) => {
+          const isLast = idx === completedMessages.length - 1;
+          return (
+            <MessageBlock
+              key={msg.id || idx}
+              queryData={msg}
+              isFavorite={isLast ? isFavorite : false}
+              onToggleFavorite={isLast ? onToggleFavorite : undefined}
+              isSaved={isLast ? isSaved : false}
+              onSaveQuery={isLast ? onSaveQuery : undefined}
+              isLast={isLast && !loading}
+            />
+          );
+        })}
+
+        {/* Loading indicator for follow-up */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center gap-3 py-10">
+            <div className="w-10 h-10 rounded-2xl bg-accent flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground">Processing your question...</p>
+              <p className="text-xs text-muted-foreground mt-1">Running {mode} pipeline with {llm}</p>
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      <FollowUpInput onSend={onFollowUp} disabled={loading} />
+    </div>
   );
 }
