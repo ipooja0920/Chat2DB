@@ -8,18 +8,22 @@ export default function ContextView({ queryData }) {
   const tablesCount = queryData.tables_count || 0;
   const sourcesCount = queryData.sources_count || 0;
 
-  // Extract table names from SQL query (simplified parsing)
+  // Extract table names from SQL query
   const extractTablesFromSQL = (sql) => {
     if (!sql) return [];
-    const fromMatch = sql.match(/FROM\s+([A-Za-z0-9_,\s]+)(?:WHERE|JOIN|GROUP|ORDER|LIMIT|$)/gi);
-    if (!fromMatch) return [];
-    const tables = fromMatch[0]
-      .replace(/FROM|WHERE|JOIN|GROUP|ORDER|LIMIT/gi, "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t && !t.match(/^\d+$|^ON$/i))
-      .slice(0, 5);
-    return tables;
+    const tables = new Set();
+    
+    // Extract FROM table
+    const fromMatch = sql.match(/FROM\s+([A-Za-z0-9_]+)/i);
+    if (fromMatch) tables.add(fromMatch[1]);
+    
+    // Extract JOIN tables
+    const joinMatches = sql.matchAll(/(?:INNER|LEFT|RIGHT|FULL)?\s*JOIN\s+([A-Za-z0-9_]+)/gi);
+    for (const match of joinMatches) {
+      if (match[1]) tables.add(match[1]);
+    }
+    
+    return Array.from(tables).slice(0, 10);
   };
 
   const tables = extractTablesFromSQL(queryData.sql_query) || [];
