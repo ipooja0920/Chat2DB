@@ -94,6 +94,8 @@ Most people who need insights from databases cannot write SQL. Even analysts who
 - System identifies intent (Analytical, Lookup, Aggregation, Ranking, Filter, Trend)
 - Generates optimized SQL for the selected database schema
 - Returns structured results with explanation
+- **NEW:** Multi-turn conversation context — LLM remembers previous queries to avoid hallucination and clarify vague questions
+- **NEW:** "Rewritten Query" display shows how the LLM interpreted the user's question for verification
 
 ### 5.2 Multi-Pipeline AI Processing
 - **RAG (Standard)**: Retrieval-Augmented Generation — schema context fed to LLM for SQL generation
@@ -141,6 +143,16 @@ Most people who need insights from databases cannot write SQL. Even analysts who
 - Full results export: summary, stats, data table, SQL, explanation
 - Favorites export: branded PDF with question, summary, stats, SQL
 - Powered by jsPDF
+
+### 5.11 Human-in-the-Loop Feedback System
+- **Thumbs Up/Down buttons** on every query result for instant feedback
+- **Comment section** for detailed feedback:
+  - Positive feedback: Optional notes on what worked well
+  - Negative feedback: Users can describe what was wrong or provide the correct question/answer
+- **Self-Correcting Agent**: System automatically re-runs the pipeline based on feedback:
+  - If interpretation was wrong → re-run with the corrected question from user comments
+  - If explanation was unclear → re-run with request for clearer explanation
+- Feedback loop enables continuous model improvement and human validation of answers
 
 ---
 
@@ -244,6 +256,13 @@ Query Result (columns + rows)
 
 ## 7. Agents & LLM Usage
 
+### Multi-Turn Context Architecture
+- **Conversation History in Prompts**: Previous 4 query-answer pairs are injected as context
+- **Feedback Integration**: User feedback (positive/negative) is included in the prompt for subsequent queries
+- **Dynamic Rewriting**: LLM generates a "rewritten_query" field explaining how it interpreted the user's question
+
+## 8. Agents & LLM Usage (Original)
+
 ### Agent 1: SQL Generation Agent (RAG/TAG pipelines)
 - **Role:** Translates natural language to SQL
 - **Model:** GPT-4 or Claude Sonnet (user-selected)
@@ -307,7 +326,7 @@ Chat2DB deliberately uses a **single-pass Hybrid pipeline** rather than multiple
 
 ---
 
-## 8. System Architecture
+## 9. System Architecture
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -351,7 +370,7 @@ Chat2DB deliberately uses a **single-pass Hybrid pipeline** rather than multiple
 
 ---
 
-## 9. Database Layer
+## 10. Database Layer
 
 ### Chinook Database (Digital Music Store)
 **Tables:** Artist, Album, Genre, MediaType, Track, Playlist, PlaylistTrack, Employee, Customer, Invoice, InvoiceLine  
@@ -378,7 +397,7 @@ Chat2DB deliberately uses a **single-pass Hybrid pipeline** rather than multiple
 
 ---
 
-## 10. Frontend Architecture
+## 11. Frontend Architecture
 
 ### State Management
 | State | Location | Persistence |
@@ -415,7 +434,7 @@ Chat (page)
 
 ---
 
-## 11. Data Flow Diagrams
+## 12. Data Flow Diagrams
 
 ### New Question Flow
 ```
@@ -461,7 +480,7 @@ User clicks history entry → handleSelectConversation(convId)
 
 ---
 
-## 12. Feature Specifications
+## 13. Feature Specifications
 
 ### 12.1 Mode Switcher
 | Mode | Pipeline | LLM Calls | Best For |
@@ -502,9 +521,26 @@ User clicks history entry → handleSelectConversation(convId)
 - Stores: question, SQL, intent, pipeline, database, savedAt
 - Actions: Copy SQL, View, Remove
 
+### 12.7 Multi-Turn Context
+- **Conversation Memory**: Last 4 turns of conversation are included as context for each new query
+- **Prevents Hallucination**: LLM can reference previous questions/answers to clarify vague follow-ups
+- **Rewritten Query Display**: Shows how the LLM interpreted the current question (1-2 sentences)
+- **Human Verification**: Users can confirm if the interpretation matches their intent before seeing results
+
+### 12.8 Feedback & Self-Correction
+- **Thumbs Up/Down Controls**: Quick feedback mechanism on every result
+- **Comment Box**: 
+  - Supports optional feedback for positive results
+  - Required for negative feedback with context (corrected question, explanation notes)
+- **Automatic Re-runs**:
+  - Negative feedback with corrected question → LLM re-runs with new question
+  - Negative feedback with explanation notes → LLM re-runs with request for clarity
+  - Positive feedback → Logged for model improvement (no re-run)
+- **Feedback Collection**: Enables dataset creation for model fine-tuning and improvement
+
 ---
 
-## 13. Evaluation Framework
+## 14. Evaluation Framework
 
 ### 13.1 Overview
 
@@ -571,7 +607,7 @@ The Deno backend function:
 
 ---
 
-## 14. Storage & Persistence
+## 15. Storage & Persistence
 
 | Data | Storage | Key | Max Size |
 |------|---------|-----|----------|
@@ -584,7 +620,7 @@ The Deno backend function:
 
 ---
 
-## 15. PDF Export Subsystem
+## 16. PDF Export Subsystem
 
 ### Full Query Export (`exportPdf.js`)
 Generates a multi-page A4 PDF containing:
@@ -612,7 +648,7 @@ Both use **jsPDF** (no server-side rendering required — fully client-side).
 
 ---
 
-## 16. Requirements & Dependencies
+## 17. Requirements & Dependencies
 
 ### API Keys Required
 | Key | Provider | Purpose |
@@ -641,7 +677,7 @@ Both use **jsPDF** (no server-side rendering required — fully client-side).
 
 ---
 
-## 17. How to Run
+## 18. How to Run
 
 ### Production (Base44 Cloud)
 1. Log in to [base44.com](https://base44.com)
@@ -671,7 +707,7 @@ npm run dev
 
 ---
 
-## 18. Performance Optimization Strategy
+## 19. Performance Optimization Strategy
 
 ### Initial Challenge
 Early iterations exhibited slow execution due to:
@@ -718,7 +754,7 @@ Early iterations exhibited slow execution due to:
 
 ---
 
-## 19. Constraints & Limitations
+## 20. Constraints & Limitations
 
 | Constraint | Detail |
 |------------|--------|
@@ -732,7 +768,7 @@ Early iterations exhibited slow execution due to:
 
 ---
 
-## 20. Future Roadmap
+## 21. Future Roadmap
 
 | Feature | Priority | Description |
 |---------|----------|-------------|
