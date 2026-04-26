@@ -1,4 +1,5 @@
 import { base44 } from "@/api/base44Client";
+import { classifyQuestion } from "@/lib/questionClassifier";
 
 const MODEL_MAP = {
   OpenAI: "gpt_5",
@@ -287,8 +288,17 @@ export async function runQuery(question, mode, llmProvider, databaseId = "chinoo
   // Use cached schema to avoid re-injecting the same schema repeatedly
   const schema = getCachedSchema(databaseId);
 
-  if (mode === "Standard") {
-    return ragPipeline(question, llmProvider, schema);
+  // Classify question to determine best model
+  const classification = await classifyQuestion(question, schema);
+  
+  // Override LLM provider if classifier recommends gpt_5_mini for simple queries
+  let effectiveLlm = llmProvider;
+  if (classification.recommended_model === "gpt_5_mini") {
+    effectiveLlm = "OpenAI"; // gpt_5_mini maps to OpenAI in MODEL_MAP
   }
-  return hybridPipeline(question, llmProvider, schema);
+
+  if (mode === "Standard") {
+    return ragPipeline(question, effectiveLlm, schema);
+  }
+  return hybridPipeline(question, effectiveLlm, schema);
 }
