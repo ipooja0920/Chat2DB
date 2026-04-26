@@ -5,8 +5,8 @@ const MAX_FAVORITES = 20;
 
 function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    localStorage.removeItem(STORAGE_KEY); // Clear for fresh testing
+    return [];
   } catch {
     return [];
   }
