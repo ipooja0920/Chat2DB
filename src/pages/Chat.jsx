@@ -7,6 +7,7 @@ import FollowUpInput from "@/components/chat/FollowUpInput";
 import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
 import SavedQueries from "@/pages/SavedQueries";
+import ExploreSchema from "@/pages/ExploreSchema";
 import { runQuery, getDatabaseById, DATABASES } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
@@ -191,6 +192,7 @@ export default function Chat() {
   const isDashboard = activeTab === "dashboard" || currentThread.length === 0;
   const isFavoritesPage = activePage === "Favorites";
   const isSavedQueriesPage = activePage === "Saved Queries";
+  const isExploreSchemaPage = activePage === "Explore Schema";
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
@@ -243,7 +245,9 @@ export default function Chat() {
 
         {/* Content */}
         <div className="flex-1 flex flex-col overflow-hidden bg-card mx-5 mb-0 rounded-t-xl border border-b-0 border-border shadow-sm">
-          {isFavoritesPage ? (
+          {isExploreSchemaPage ? (
+            <ExploreSchema database={database} />
+          ) : isFavoritesPage ? (
             <Favorites
               favorites={favorites}
               onRemove={removeFavorite}
