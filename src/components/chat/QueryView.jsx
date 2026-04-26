@@ -8,7 +8,7 @@ import ChartView from "./ChartView";
 import { Loader2 } from "lucide-react";
 import { exportQueryToPdf } from "@/lib/exportPdf";
 
-export default function QueryView({ queryData, loading, onFollowUp, mode, llm }) {
+export default function QueryView({ queryData, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite }) {
   const [resultsTab, setResultsTab] = useState("Results");
   const [expanded, setExpanded] = useState(false);
 
@@ -96,6 +96,8 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm })
             ? `Sources: ${queryData.sources_count} docs, ${queryData.tables_count || 0} tables`
             : null
         }
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
       />
       <StatsCards stats={queryData.stats} />
 

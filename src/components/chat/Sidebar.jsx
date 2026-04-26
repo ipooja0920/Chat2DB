@@ -2,14 +2,13 @@ import React from "react";
 import { Plus, LayoutDashboard, Database, BookmarkCheck, Star, Search, LogOut, MessageSquare, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard" },
-  { icon: Database, label: "Explore Schema" },
-  { icon: BookmarkCheck, label: "Saved Queries" },
-  { icon: Star, label: "Favorites" },
-];
-
-export default function Sidebar({ conversations, activeConversation, onSelectConversation, onNewQuestion }) {
+export default function Sidebar({ conversations, activeConversation, onSelectConversation, onNewQuestion, activePage, onNavigate, favoritesCount }) {
+  const navItems = [
+    { icon: LayoutDashboard, label: "Dashboard" },
+    { icon: Database, label: "Explore Schema" },
+    { icon: BookmarkCheck, label: "Saved Queries" },
+    { icon: Star, label: "Favorites", badge: favoritesCount },
+  ];
   return (
     <div className="w-[240px] min-w-[240px] h-screen bg-sidebar flex flex-col border-r border-sidebar-border">
       {/* Logo */}
@@ -39,10 +38,21 @@ export default function Sidebar({ conversations, activeConversation, onSelectCon
         {navItems.map((item) => (
           <button
             key={item.label}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-[13px] transition-colors"
+            onClick={() => onNavigate?.(item.label)}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors",
+              activePage === item.label
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            )}
           >
-            <item.icon className="w-4 h-4 opacity-70" />
-            {item.label}
+            <item.icon className="w-4 h-4 opacity-70 flex-shrink-0" />
+            <span className="flex-1 text-left">{item.label}</span>
+            {item.badge > 0 && (
+              <span className="text-[10px] font-bold bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full leading-none">
+                {item.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>

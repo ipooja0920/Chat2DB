@@ -4,14 +4,21 @@ import TopBar from "@/components/chat/TopBar";
 import QueryTabs from "@/components/chat/QueryTabs";
 import QueryView from "@/components/chat/QueryView";
 import FollowUpInput from "@/components/chat/FollowUpInput";
+import OverflowDialog from "@/components/chat/OverflowDialog";
+import Favorites from "@/pages/Favorites";
 import { sampleConversations } from "@/lib/sampleData";
 import { runQuery } from "@/lib/queryEngine";
+import { useFavorites } from "@/hooks/useFavorites";
 import { Menu } from "lucide-react";
 
 export default function Chat() {
   const [mode, setMode] = useState("Hybrid");
   const [llm, setLlm] = useState("OpenAI");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePage, setActivePage] = useState("Dashboard");
+  const [overflowState, setOverflowState] = useState(null); // { queryData, oldest }
+
+  const { favorites, isFavorite, addFavorite, confirmAdd, removeFavorite } = useFavorites();
 
   // tabs: [{id, title}]
   const [tabs, setTabs] = useState([]);
@@ -41,7 +48,7 @@ export default function Chat() {
       const result = await runQuery(question, mode, llm);
       setQueryResults((prev) => ({
         ...prev,
-        [id]: { question, ...result },
+        [id]: { id, question, ...result },
       }));
       // Update tab title to a shorter version if needed
       if (question.length > 40) {
@@ -85,6 +92,17 @@ export default function Chat() {
     setActiveTab("dashboard");
   }, []);
 
+  const handleToggleFavorite = useCallback((queryData) => {
+    if (isFavorite(queryData.id)) {
+      removeFavorite(queryData.id);
+      return;
+    }
+    const result = addFavorite(queryData);
+    if (result?.needsConfirm) {
+      setOverflowState({ queryData, oldest: result.oldest });
+    }
+  }, [isFavorite, addFavorite, removeFavorite]);
+
   const handleSelectConversation = useCallback((convId) => {
     // If this conversation has a loaded result, switch to it
     if (queryResults[convId]) {
@@ -100,6 +118,7 @@ export default function Chat() {
   const currentResult = queryResults[activeTab];
   const isLoading = currentResult === "loading";
   const isDashboard = activeTab === "dashboard" || !currentResult;
+  const isFavoritesPage = activePage === "Favorites";
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
@@ -117,7 +136,10 @@ export default function Chat() {
           conversations={conversations}
           activeConversation={activeTab}
           onSelectConversation={handleSelectConversation}
-          onNewQuestion={handleAddTab}
+          onNewQuestion={() => { setActivePage("Dashboard"); handleAddTab(); }}
+          activePage={activePage}
+          onNavigate={(page) => { setActivePage(page); setSidebarOpen(false); }}
+          favoritesCount={favorites.length}
         />
       </div>
 
@@ -146,7 +168,16 @@ export default function Chat() {
 
         {/* Content */}
         <div className="flex-1 flex flex-col overflow-hidden bg-card mx-5 mb-0 rounded-t-xl border border-b-0 border-border shadow-sm">
-          {isDashboard ? (
+          {isFavoritesPage ? (
+            <Favorites
+              favorites={favorites}
+              onRemove={removeFavorite}
+              onSelectFavorite={(fav) => {
+                setActivePage("Dashboard");
+                handleSelectConversation(fav.id);
+              }}
+            />
+          ) : isDashboard ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-6 p-10">
               <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -187,10 +218,21 @@ export default function Chat() {
               onFollowUp={handleAskQuestion}
               mode={mode}
               llm={llm}
+              isFavorite={!isLoading && currentResult ? isFavorite(currentResult.id) : false}
+              onToggleFavorite={() => !isLoading && currentResult && handleToggleFavorite(currentResult)}
             />
           )}
         </div>
       </div>
+
+      {/* Overflow confirmation dialog */}
+      {overflowState && (
+        <OverflowDialog
+          oldest={overflowState.oldest}
+          onConfirm={() => { confirmAdd(overflowState.queryData); setOverflowState(null); }}
+          onCancel={() => setOverflowState(null)}
+        />
+      )}
     </div>
   );
 }

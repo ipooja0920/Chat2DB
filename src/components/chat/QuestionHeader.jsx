@@ -2,7 +2,7 @@ import React from "react";
 import { Bot, Star, MoreVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export default function QuestionHeader({ question, time, intent, mode, sources }) {
+export default function QuestionHeader({ question, time, intent, mode, sources, isFavorite, onToggleFavorite }) {
   return (
     <div className="px-6 py-4 flex items-start gap-3">
       <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -15,7 +15,19 @@ export default function QuestionHeader({ question, time, intent, mode, sources }
           </h2>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-xs text-muted-foreground">{time}</span>
-            <Star className="w-4 h-4 text-muted-foreground/40 cursor-pointer hover:text-amber-400 transition-colors" />
+            <button
+              onClick={onToggleFavorite}
+              title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+              className="transition-transform hover:scale-110 active:scale-95"
+            >
+              <Star
+                className={`w-4 h-4 transition-colors ${
+                  isFavorite
+                    ? "text-amber-400 fill-amber-400"
+                    : "text-muted-foreground/40 hover:text-amber-400"
+                }`}
+              />
+            </button>
             <MoreVertical className="w-4 h-4 text-muted-foreground/40 cursor-pointer hover:text-foreground" />
           </div>
         </div>
