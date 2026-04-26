@@ -231,7 +231,7 @@ export default function Chat() {
               <div className="text-center">
                 <h2 className="text-xl font-semibold text-foreground mb-2">Welcome to Chat2DB</h2>
                 <p className="text-muted-foreground text-sm max-w-sm">
-                  Ask a question in natural language and the AI will generate SQL, run it, and explain the results using <strong>{mode}</strong> mode with <strong>{llm}</strong>.
+                  Ask a question in natural language and the AI will generate SQL, run it, and explain the results using <strong>{mode === "Hybrid" ? "Hybrid" : "Standard"}</strong> or <strong>{mode === "Hybrid" ? "Standard" : "Hybrid"}</strong> mode with <strong>OpenAI</strong> or <strong>Claude</strong>.
                 </p>
               </div>
               <div className="w-full max-w-lg">
