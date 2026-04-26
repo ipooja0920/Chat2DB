@@ -66,10 +66,10 @@ export default function Chat() {
     setConversations([]);
   }, []);
 
-  const runQueryInTab = useCallback(async (question, tabId, onComplete) => {
+  const runQueryInTab = useCallback(async (question, tabId, onComplete, conversationHistory = []) => {
     appendLoadingMessage(tabId, question);
     try {
-      const result = await runQuery(question, mode, llm, database);
+      const result = await runQuery(question, mode, llm, database, conversationHistory);
       const message = { id: `${tabId}-${Date.now()}`, question, database, ...result };
       setQueryResults((prev) => {
         const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
@@ -109,7 +109,7 @@ export default function Chat() {
     await runQueryInTab(question, tabId, (newThread) => {
       // Snapshot = just this first message
       pushConversation(tabId, question, newThread.slice(0, 1));
-    });
+    }, []);
   }, [runQueryInTab, pushConversation]);
 
   // Follow-up — appends to current tab's thread; each follow-up gets its own history entry
@@ -119,11 +119,12 @@ export default function Chat() {
       return;
     }
     const convId = `${activeTab}-fu-${Date.now()}`;
+    const currentThread = Array.isArray(queryResults[activeTab]) ? queryResults[activeTab] : [];
     await runQueryInTab(question, activeTab, (newThread) => {
       // Snapshot = everything up to and including this answer
       pushConversation(convId, question, [...newThread]);
-    });
-  }, [activeTab, runQueryInTab, handleAskQuestion, pushConversation]);
+    }, currentThread);
+  }, [activeTab, runQueryInTab, queryResults, handleAskQuestion, pushConversation]);
 
   const handleCloseTab = useCallback((id) => {
     setTabs((prev) => {
@@ -188,6 +189,26 @@ export default function Chat() {
       setSavedOverflowState({ queryData, oldest: result.oldest });
     }
   }, [isSaved, addSavedQuery, removeSavedQuery]);
+
+  const handleFeedback = useCallback((messageId, feedbackType, comment) => {
+    // Build feedback message for re-run
+    const feedbackMessage = `${feedbackType === "positive" ? "[POSITIVE FEEDBACK]" : "[NEEDS IMPROVEMENT]"} ${comment || ""}`.trim();
+    
+    // If user says interpretation was wrong, they provide better question in comment
+    if (feedbackType === "negative" && comment) {
+      // Re-run with feedback for the agent to understand the correction
+      handleFollowUp(comment);
+    }
+    // For other negative feedback (unclear explanation), re-run current question with feedback
+    else if (feedbackType === "negative" && !comment) {
+      const currentThread = Array.isArray(queryResults[activeTab]) ? queryResults[activeTab] : [];
+      const lastQuestion = currentThread[currentThread.length - 1]?.question;
+      if (lastQuestion) {
+        handleFollowUp(`${lastQuestion} (Previous explanation was unclear, please clarify)`);
+      }
+    }
+    // Positive feedback: just acknowledge (no action needed)
+  }, [activeTab, queryResults, handleFollowUp]);
 
   const currentThread = Array.isArray(queryResults[activeTab]) ? queryResults[activeTab] : [];
   const isThreadLoading = currentThread.length > 0 && currentThread[currentThread.length - 1]?._loading;
@@ -272,7 +293,7 @@ export default function Chat() {
               }}
             />
           ) : isDashboard ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-6 p-10">
+            <div className="flex-1 flex flex-col items-center justify-center gap-6 p-10 overflow-y-auto">
               <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-12m12-11.25V3m0 13.5v3.75m-12-3.75v3.75m0 0h12" />
@@ -310,6 +331,7 @@ export default function Chat() {
               onToggleFavorite={() => lastResult && handleToggleFavorite(lastResult)}
               isSaved={lastResult ? isSaved(lastResult.id) : false}
               onSaveQuery={() => lastResult && handleToggleSavedQuery(lastResult)}
+              onFeedback={handleFeedback}
             />
           )}
         </div>

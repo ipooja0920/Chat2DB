@@ -88,15 +88,18 @@ export function getDatabaseById(id) {
 
 // ─── Pipelines ────────────────────────────────────────────────────────────────
 
-async function ragPipeline(question, llmProvider, dbSchema) {
+async function ragPipeline(question, llmProvider, dbSchema, contextMessages = "", userFeedback = null) {
   const model = MODEL_MAP[llmProvider];
+
+  const contextPrompt = contextMessages ? `\nPrevious conversation context:\n${contextMessages}` : "";
+  const feedbackPrompt = userFeedback ? `\nUser feedback from previous answer:\n${userFeedback}` : "";
 
   const sqlResponse = await base44.integrations.Core.InvokeLLM({
     model,
     prompt: `You are a SQL expert. Using the database schema below as context, generate a precise SQL SELECT query to answer the user's question.
 
 Database Schema:
-${dbSchema}
+${dbSchema}${contextPrompt}${feedbackPrompt}
 
 User Question: ${question}
 
@@ -121,22 +124,24 @@ Rules:
 The SQL query generated was:
 ${sqlResponse.sql_query}
 
-Relevant tables used: ${(sqlResponse.relevant_tables || []).join(", ")}
+Relevant tables used: ${(sqlResponse.relevant_tables || []).join(", ")}${contextPrompt}${feedbackPrompt}
 
 Now provide a complete response based on the following database schema:
 ${dbSchema}
 
 Format your response as JSON:
+- rewritten_query: how you interpreted the user's question (1-2 sentences)
 - summary: a 1-2 sentence answer in plain business English
 - intent: classify as one of "Analytical", "Lookup", "Aggregation", "Ranking", "Filter", "Trend"
 - sql_query: the SQL query
-- explanation: 2-3 sentences explaining what the query does
+- explanation: 2-3 sentences explaining what the query does in simple terms
 - columns: array of {key, label} objects for the result table
 - rows: array of result objects (5-15 realistic rows consistent with this database)
 - stats: array of up to 4 key metrics, each with {label, value, icon, color} where icon is one of "dollar","globe","trending","clock","users","layers" and color is one of "purple","blue","green","orange"`,
     response_json_schema: {
       type: "object",
       properties: {
+        rewritten_query: { type: "string" },
         summary: { type: "string" },
         intent: { type: "string" },
         sql_query: { type: "string" },
@@ -231,8 +236,11 @@ Return JSON:
   };
 }
 
-async function hybridPipeline(question, llmProvider, dbSchema) {
+async function hybridPipeline(question, llmProvider, dbSchema, contextMessages = "", userFeedback = null) {
   const model = MODEL_MAP[llmProvider];
+
+  const contextPrompt = contextMessages ? `\nPrevious conversation context:\n${contextMessages}` : "";
+  const feedbackPrompt = userFeedback ? `\nUser feedback from previous answer:\n${userFeedback}` : "";
 
   const result = await base44.integrations.Core.InvokeLLM({
     model,
@@ -241,7 +249,7 @@ async function hybridPipeline(question, llmProvider, dbSchema) {
 2. TAG (Table-Augmented Generation): Synthesize SQL by deeply analyzing table structures
 
 Database Schema:
-${dbSchema}
+${dbSchema}${contextPrompt}${feedbackPrompt}
 
 User Question: "${question}"
 
@@ -253,10 +261,11 @@ Hybrid approach:
 IMPORTANT: All results, data, and insights must be consistent with the database schema provided above. Do not mix data from other databases.
 
 Return complete JSON:
+- rewritten_query: how you interpreted the user's question (1-2 sentences)
 - summary: direct one-line answer
 - intent: classify as "Analytical"|"Lookup"|"Aggregation"|"Ranking"|"Filter"|"Trend"
 - sql_query: the final optimized SQL SELECT query
-- explanation: 2-3 sentences on methodology and findings
+- explanation: 2-3 sentences on methodology and findings in simple terms
 - columns: array of {key: string, label: string} for result columns
 - rows: array of 5-20 realistic result objects matching the columns
 - stats: array of 2-4 highlight metrics each with {label, value, icon, color}
@@ -267,6 +276,7 @@ Return complete JSON:
     response_json_schema: {
       type: "object",
       properties: {
+        rewritten_query: { type: "string" },
         summary: { type: "string" },
         intent: { type: "string" },
         sql_query: { type: "string" },
@@ -288,9 +298,16 @@ Return complete JSON:
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function runQuery(question, mode, llmProvider, databaseId = "chinook") {
+export async function runQuery(question, mode, llmProvider, databaseId = "chinook", conversationHistory = [], userFeedback = null) {
   // Use cached schema to avoid re-injecting the same schema repeatedly
   const schema = getCachedSchema(databaseId);
+
+  // Build conversation context from previous messages
+  const contextMessages = conversationHistory
+    .filter(m => !m._loading)
+    .slice(-4) // Last 4 turns for context
+    .map(m => `Q: ${m.question}\nA: ${m.summary || m.explanation}`)
+    .join("\n---\n");
 
   // Classify question to determine best model
   const classification = await classifyQuestion(question, schema);
@@ -302,7 +319,7 @@ export async function runQuery(question, mode, llmProvider, databaseId = "chinoo
   }
 
   if (mode === "Standard") {
-    return ragPipeline(question, effectiveLlm, schema);
+    return ragPipeline(question, effectiveLlm, schema, contextMessages, userFeedback);
   }
-  return hybridPipeline(question, effectiveLlm, schema);
+  return hybridPipeline(question, effectiveLlm, schema, contextMessages, userFeedback);
 }

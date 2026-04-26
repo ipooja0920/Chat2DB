@@ -5,10 +5,11 @@ import ResultsTabs from "./ResultsTabs";
 import DataTable from "./DataTable";
 import FollowUpInput from "./FollowUpInput";
 import ChartView from "./ChartView";
+import FeedbackSection from "./FeedbackSection";
 import { Loader2, Copy, Check, BookmarkPlus } from "lucide-react";
 import { exportQueryToPdf } from "@/lib/exportPdf";
 
-function MessageBlock({ queryData, isFavorite, onToggleFavorite, isSaved, onSaveQuery, isLast }) {
+function MessageBlock({ queryData, isFavorite, onToggleFavorite, isSaved, onSaveQuery, isLast, onFeedback }) {
   const [resultsTab, setResultsTab] = useState("Results");
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -56,8 +57,24 @@ function MessageBlock({ queryData, isFavorite, onToggleFavorite, isSaved, onSave
           </div>
         </div>
       ) : resultsTab === "Explanation" ? (
-        <div className="flex-1 p-6 overflow-auto">
-          <p className="text-sm text-foreground leading-relaxed">{queryData.explanation}</p>
+        <div className="flex-1 p-6 overflow-auto space-y-4">
+          {queryData.rewritten_query && (
+            <div className="bg-accent/40 border border-accent rounded-xl p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">How we interpreted your question</p>
+              <p className="text-sm text-foreground italic">{queryData.rewritten_query}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Explanation</p>
+            <p className="text-sm text-foreground leading-relaxed">{queryData.explanation}</p>
+          </div>
+          {isLast && onFeedback && (
+            <FeedbackSection
+              messageId={queryData.id}
+              onFeedback={onFeedback}
+              loading={false}
+            />
+          )}
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
@@ -117,7 +134,7 @@ function MessageBlock({ queryData, isFavorite, onToggleFavorite, isSaved, onSave
   );
 }
 
-export default function QueryView({ thread, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite, isSaved, onSaveQuery }) {
+export default function QueryView({ thread, loading, onFollowUp, mode, llm, isFavorite, onToggleFavorite, isSaved, onSaveQuery, onFeedback }) {
   const bottomRef = useRef(null);
   const completedMessages = thread.filter((m) => !m._loading);
 
@@ -141,6 +158,7 @@ export default function QueryView({ thread, loading, onFollowUp, mode, llm, isFa
               isSaved={isLast ? isSaved : false}
               onSaveQuery={isLast ? onSaveQuery : undefined}
               isLast={isLast && !loading}
+              onFeedback={isLast ? onFeedback : undefined}
             />
           );
         })}
