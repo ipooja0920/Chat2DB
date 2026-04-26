@@ -13,6 +13,7 @@
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Features](#features)
+- [Evaluation Framework](#evaluation-framework)
 
 ---
 
@@ -140,3 +141,49 @@ npm run dev
 - 📄 **PDF Export** — Export results and favorites as PDFs
 - 💬 **Follow-up Questions** — Full conversation threading per tab
 - 📜 **Conversation History** — Last 5 sessions in the sidebar
+- 🧪 **Evaluation Framework** — Benchmark pipeline quality with built-in test suites
+
+---
+
+## Evaluation Framework
+
+Chat2DB includes a built-in evaluation system to benchmark how well each pipeline + LLM combination performs on text-to-SQL tasks.
+
+### How to Run Evals
+
+1. Click **"Evals"** in the left sidebar to open the Evaluation Framework page
+2. On the **"New Run"** tab, configure your eval:
+   - **Run Name** — give this run a descriptive label
+   - **Database** — choose Chinook or Northwind
+   - **Pipeline** — Hybrid (RAG + TAG), Standard (RAG), or TAG
+   - **LLM** — OpenAI or Claude
+   - **Test Cases** — select individual cases or use "Select all"
+3. Click **"Run X Test Cases"** to start — the backend function runs each case and evaluates it
+
+### Metrics Computed (per case & aggregated)
+
+| Metric | Description |
+|--------|-------------|
+| **Valid SQL** | Whether the generated SQL parses without syntax errors |
+| **SQL Similarity** | Sequence-match ratio between expected and generated SQL (0–1) |
+| **Translatable Accuracy** | Whether the question was correctly classified as SQL-answerable or not |
+| **Result Col Similarity** | Overlap between expected and generated output column names |
+| **Result Row Similarity** | Row-level match score |
+| **Cosine Similarity** | TF-IDF cosine similarity between expected and generated result sets |
+| **Overall Score** | Weighted composite: 30% valid SQL + 20% translatable + 30% SQL sim + 20% cosine |
+
+### Viewing Results
+
+1. After a run completes, switch to the **"History"** tab
+2. Each run card shows: pipeline, LLM, database, case count, and the **Overall Score**
+3. Click a run card to open the **drilldown view**:
+   - Score summary bars for all metrics
+   - Bar chart of aggregated metrics
+   - Per-case expandable rows: expected SQL vs. generated SQL, individual scores, and error explanations
+
+### Test Datasets
+
+- **Chinook** — 10 test cases covering artists, revenue, genre aggregations, and non-translatable questions
+- **Northwind** — 8 test cases covering products, orders, employees, and non-translatable questions
+
+> **Note:** Each test case makes one LLM call using your configured API keys (OpenAI or Anthropic). Costs are proportional to the number of test cases selected.

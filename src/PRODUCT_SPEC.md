@@ -21,12 +21,13 @@
 10. [Frontend Architecture](#10-frontend-architecture)
 11. [Data Flow Diagrams](#11-data-flow-diagrams)
 12. [Feature Specifications](#12-feature-specifications)
-13. [Storage & Persistence](#13-storage--persistence)
-14. [PDF Export Subsystem](#14-pdf-export-subsystem)
-15. [Requirements & Dependencies](#15-requirements--dependencies)
-16. [How to Run](#16-how-to-run)
-17. [Constraints & Limitations](#17-constraints--limitations)
-18. [Future Roadmap](#18-future-roadmap)
+13. [Evaluation Framework](#13-evaluation-framework)
+14. [Storage & Persistence](#14-storage--persistence)
+15. [PDF Export Subsystem](#15-pdf-export-subsystem)
+16. [Requirements & Dependencies](#16-requirements--dependencies)
+17. [How to Run](#17-how-to-run)
+18. [Constraints & Limitations](#18-constraints--limitations)
+19. [Future Roadmap](#19-future-roadmap)
 
 ---
 
@@ -474,7 +475,74 @@ User clicks history entry → handleSelectConversation(convId)
 
 ---
 
-## 13. Storage & Persistence
+## 13. Evaluation Framework
+
+### 13.1 Overview
+
+The Evaluation Framework allows developers and researchers to benchmark how well each pipeline + LLM combination performs on text-to-SQL tasks. It is accessible via the **Evals** page (sidebar navigation) and backed by the `runEvals` backend function and the `EvalResult` entity.
+
+### 13.2 How to Run an Eval
+
+1. Navigate to **Evals → New Run** in the sidebar
+2. Configure the run:
+   - **Run Name** — descriptive label for the evaluation run
+   - **Database** — Chinook or Northwind
+   - **Pipeline** — Hybrid (RAG + TAG), Standard (RAG), or TAG
+   - **LLM** — OpenAI GPT-4 or Anthropic Claude Sonnet
+   - **Test Cases** — select individual or all cases from the dataset
+3. Click **"Run X Test Cases"** — this invokes `runEvals` backend function
+4. Results are saved to the `EvalResult` entity and visible in **History**
+
+### 13.3 Test Datasets (`lib/evalDatasets.js`)
+
+| Database | Cases | Translatable | Non-Translatable |
+|----------|-------|-------------|------------------|
+| Chinook | 10 | 8 | 2 |
+| Northwind | 8 | 6 | 2 |
+
+Each test case contains:
+- `question` — natural language query
+- `expected_sql` — reference SQL (for translatable cases)
+- `expected_translatable` — boolean flag
+- `expected_rows` / `expected_cols` — reference result schema
+
+### 13.4 Metrics
+
+| Metric | Computation | Weight in Overall |
+|--------|-------------|-------------------|
+| **Valid SQL** | Syntax check: balanced parentheses, SELECT clause present | 30% |
+| **SQL Similarity** | LCS-based sequence match ratio vs. expected SQL | 30% |
+| **Translatable Accuracy** | Correct classification of question as SQL-answerable or not | 20% |
+| **Result Col Similarity** | Column name overlap (fuzzy match) between expected and generated | — |
+| **Result Row Similarity** | Row-level match count vs. expected row count | — |
+| **Cosine Similarity** | TF-IDF cosine similarity on result set text representations | 20% |
+| **Overall Score** | Weighted composite of above (0–1 scale) | — |
+
+### 13.5 Eval Backend Function (`functions/runEvals.js`)
+
+The Deno backend function:
+1. Receives `eval_run_id`, `test_cases`, `pipeline`, `llm`, `database`, `db_schema`
+2. For each test case, calls the LLM to generate SQL (same model as the main query engine)
+3. Computes all metrics using pure JavaScript ports of Python evaluation tools (SequenceMatcher, TF-IDF cosine)
+4. Aggregates metrics and updates the `EvalResult` entity record with `status: "completed"`
+
+### 13.6 Results UI
+
+| View | Description |
+|------|-------------|
+| **History Tab** | List of all eval runs with status, config, and overall score badge |
+| **Drilldown View** | Score summary bars + bar chart + per-case expandable rows |
+| **Per-Case Row** | Expected SQL vs. Generated SQL, individual metric scores, error explanation |
+
+### 13.7 Data Persistence
+
+- Each eval run creates an `EvalResult` entity record (persisted to Base44 database)
+- Run history survives page refreshes (unlike chat session data)
+- Last 20 runs are loaded in History view
+
+---
+
+## 14. Storage & Persistence
 
 | Data | Storage | Key | Max Size |
 |------|---------|-----|----------|
@@ -487,7 +555,7 @@ User clicks history entry → handleSelectConversation(convId)
 
 ---
 
-## 14. PDF Export Subsystem
+## 15. PDF Export Subsystem
 
 ### Full Query Export (`exportPdf.js`)
 Generates a multi-page A4 PDF containing:
@@ -515,7 +583,7 @@ Both use **jsPDF** (no server-side rendering required — fully client-side).
 
 ---
 
-## 15. Requirements & Dependencies
+## 16. Requirements & Dependencies
 
 ### API Keys Required
 | Key | Provider | Purpose |
@@ -544,7 +612,7 @@ Both use **jsPDF** (no server-side rendering required — fully client-side).
 
 ---
 
-## 16. How to Run
+## 17. How to Run
 
 ### Production (Base44 Cloud)
 1. Log in to [base44.com](https://base44.com)
@@ -574,7 +642,7 @@ npm run dev
 
 ---
 
-## 17. Constraints & Limitations
+## 18. Constraints & Limitations
 
 | Constraint | Detail |
 |------------|--------|
@@ -588,7 +656,7 @@ npm run dev
 
 ---
 
-## 18. Future Roadmap
+## 19. Future Roadmap
 
 | Feature | Priority | Description |
 |---------|----------|-------------|
