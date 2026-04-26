@@ -9,7 +9,7 @@ import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
 import SavedQueries from "@/pages/SavedQueries";
 import ExploreSchema from "@/pages/ExploreSchema";
-import { runQuery, getDatabaseById, DATABASES } from "@/lib/queryEngine";
+import { runQuery, getDatabaseById, DATABASES, clearSchemaCache } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
 import { Menu } from "lucide-react";
@@ -56,8 +56,9 @@ export default function Chat() {
     });
   }, []);
 
-  // When the user switches DB: clear all tabs, results, and conversations
+  // When the user switches DB: clear all tabs, results, conversations, and schema cache
   const handleDatabaseChange = useCallback((newDb) => {
+    clearSchemaCache();
     setDatabase(newDb);
     setTabs([]);
     setActiveTab("dashboard");

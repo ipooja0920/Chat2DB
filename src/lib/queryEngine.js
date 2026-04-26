@@ -19,6 +19,10 @@ function getCachedSchema(databaseId) {
   return db.schema;
 }
 
+export function clearSchemaCache() {
+  Object.keys(schemaCache).forEach((key) => delete schemaCache[key]);
+}
+
 // ─── Database Schemas ────────────────────────────────────────────────────────
 
 const CHINOOK_SCHEMA = `
