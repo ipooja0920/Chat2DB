@@ -495,7 +495,7 @@ User clicks history entry → handleSelectConversation(convId)
 | Chart | AI-chosen visualization |
 | SQL | Generated SQL with copy + save buttons |
 | Explanation | Plain-English explanation of query |
-| Context | (Reserved for future schema context view) |
+| Context | Tables used, JOIN relationships, RAG source retrieval context with similarity scores, and query execution metrics |
 
 ### 12.3 Stats Cards
 - Up to 4 highlight metrics per query
@@ -526,6 +526,14 @@ User clicks history entry → handleSelectConversation(convId)
 - **Prevents Hallucination**: LLM can reference previous questions/answers to clarify vague follow-ups
 - **Rewritten Query Display**: Shows how the LLM interpreted the current question (1-2 sentences)
 - **Human Verification**: Users can confirm if the interpretation matches their intent before seeing results
+
+### 12.9 Context View (Query Transparency)
+The **Context** tab provides technical transparency into query generation and execution:
+- **Tables Used**: Extracts all tables from FROM and JOIN clauses in the generated SQL
+- **Relationships**: Visualizes JOIN conditions between tables
+- **RAG Source Retrieval**: Displays top retrieved schema context with similarity scores (0-100%)
+- **Query Metadata**: Shows execution time (ms) and total tables involved
+- **Purpose**: Enables users to understand how the system generated SQL and validate correctness
 
 ### 12.8 Feedback & Self-Correction
 - **Thumbs Up/Down Controls**: Quick feedback mechanism on every result
