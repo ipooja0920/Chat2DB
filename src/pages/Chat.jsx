@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/chat/Sidebar";
 import TopBar from "@/components/chat/TopBar";
@@ -16,6 +16,13 @@ import { Menu } from "lucide-react";
 
 export default function Chat() {
   const navigate = useNavigate();
+  
+  // Clear localStorage on initial mount for fresh testing
+  React.useEffect(() => {
+    localStorage.removeItem("chat2db_favorites");
+    localStorage.removeItem("chat2db_saved_queries");
+  }, []);
+  
   const [mode, setMode] = useState("Hybrid");
   const [llm, setLlm] = useState("OpenAI");
   const [database, setDatabase] = useState("chinook");
