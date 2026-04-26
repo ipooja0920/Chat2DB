@@ -6,9 +6,11 @@ import DataTable from "./DataTable";
 import FollowUpInput from "./FollowUpInput";
 import ChartView from "./ChartView";
 import { Loader2 } from "lucide-react";
+import { exportQueryToPdf } from "@/lib/exportPdf";
 
 export default function QueryView({ queryData, loading, onFollowUp, mode, llm }) {
   const [resultsTab, setResultsTab] = useState("Results");
+  const [expanded, setExpanded] = useState(false);
 
   if (loading) {
     return (
@@ -32,31 +34,8 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm })
   const now = new Date();
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  return (
+  const tabContent = (
     <>
-      <QuestionHeader
-        question={queryData.question}
-        time={time}
-        intent={queryData.intent}
-        mode={queryData.pipeline}
-        sources={
-          queryData.sources_count
-            ? `Sources: ${queryData.sources_count} docs, ${queryData.tables_count || 0} tables`
-            : null
-        }
-      />
-      <StatsCards stats={queryData.stats} />
-
-      {/* Written answer summary */}
-      {queryData.summary && (
-        <div className="px-6 pb-4">
-          <p className="text-sm text-foreground leading-relaxed bg-accent/40 border border-accent rounded-xl px-4 py-3">
-            {queryData.summary}
-          </p>
-        </div>
-      )}
-
-      <ResultsTabs activeTab={resultsTab} onTabChange={setResultsTab} />
       {resultsTab === "Results" && queryData.rows?.length > 0 ? (
         <DataTable
           columns={queryData.columns || []}
@@ -84,6 +63,59 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm })
           {resultsTab} view coming soon
         </div>
       )}
+    </>
+  );
+
+  // Expanded: full-screen overlay
+  if (expanded) {
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        <ResultsTabs
+          activeTab={resultsTab}
+          onTabChange={setResultsTab}
+          onExportPdf={() => exportQueryToPdf(queryData)}
+          onToggleExpand={() => setExpanded(false)}
+          expanded={true}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {tabContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <QuestionHeader
+        question={queryData.question}
+        time={time}
+        intent={queryData.intent}
+        mode={queryData.pipeline}
+        sources={
+          queryData.sources_count
+            ? `Sources: ${queryData.sources_count} docs, ${queryData.tables_count || 0} tables`
+            : null
+        }
+      />
+      <StatsCards stats={queryData.stats} />
+
+      {/* Written answer summary */}
+      {queryData.summary && (
+        <div className="px-6 pb-4">
+          <p className="text-sm text-foreground leading-relaxed bg-accent/40 border border-accent rounded-xl px-4 py-3">
+            {queryData.summary}
+          </p>
+        </div>
+      )}
+
+      <ResultsTabs
+        activeTab={resultsTab}
+        onTabChange={setResultsTab}
+        onExportPdf={() => exportQueryToPdf(queryData)}
+        onToggleExpand={() => setExpanded(true)}
+        expanded={false}
+      />
+      {tabContent}
       <FollowUpInput onSend={onFollowUp} />
     </>
   );
