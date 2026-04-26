@@ -5,6 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { runVizAgent } from "@/lib/vizAgent";
+import { analyzeDataSuitability } from "@/lib/chartHeuristics";
 import { Loader2, BarChart2, AlertCircle, CheckCircle2 } from "lucide-react";
 
 const COLORS = [
@@ -146,15 +147,31 @@ function renderChart(chartType, data, xKey, yKeys, title) {
 
 export default function ChartView({ question, columns, rows }) {
   const [vizConfig, setVizConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    // Only initialize once on mount (lazy load) — don't refetch on prop changes
+    if (initialized) return;
+    setInitialized(true);
+
+    if (!rows || rows.length === 0) {
+      return;
+    }
+
+    // Pre-check with client-side heuristics before calling LLM
+    const suitability = analyzeDataSuitability(columns, rows);
+    if (!suitability.suitable) {
+      setVizConfig({ suitable: false, reason: suitability.reason });
+      return;
+    }
+
+    // Only call LLM if heuristics pass
     setLoading(true);
-    setVizConfig(null);
     runVizAgent(question, columns, rows)
       .then(setVizConfig)
       .finally(() => setLoading(false));
-  }, [question, columns, rows]);
+  }, []);
 
   if (loading) {
     return (

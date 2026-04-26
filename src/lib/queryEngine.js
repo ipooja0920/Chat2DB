@@ -5,6 +5,19 @@ const MODEL_MAP = {
   Claude: "claude_sonnet_4_6",
 };
 
+// ─── Schema Caching ──────────────────────────────────────────────────────
+// Cache schemas in session to avoid re-injecting the same schema every query
+const schemaCache = {};
+
+function getCachedSchema(databaseId) {
+  if (schemaCache[databaseId]) {
+    return schemaCache[databaseId];
+  }
+  const db = DATABASES.find((d) => d.id === databaseId) || DATABASES[0];
+  schemaCache[databaseId] = db.schema;
+  return db.schema;
+}
+
 // ─── Database Schemas ────────────────────────────────────────────────────────
 
 const CHINOOK_SCHEMA = `
@@ -271,8 +284,8 @@ Return complete JSON:
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function runQuery(question, mode, llmProvider, databaseId = "chinook") {
-  const db = getDatabaseById(databaseId);
-  const schema = db.schema;
+  // Use cached schema to avoid re-injecting the same schema repeatedly
+  const schema = getCachedSchema(databaseId);
 
   if (mode === "Standard") {
     return ragPipeline(question, llmProvider, schema);
