@@ -1,74 +1,108 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import Sidebar from "@/components/chat/Sidebar";
 import TopBar from "@/components/chat/TopBar";
 import QueryTabs from "@/components/chat/QueryTabs";
-import QuestionHeader from "@/components/chat/QuestionHeader";
-import StatsCards from "@/components/chat/StatsCards";
-import ResultsTabs from "@/components/chat/ResultsTabs";
-import DataTable from "@/components/chat/DataTable";
+import QueryView from "@/components/chat/QueryView";
 import FollowUpInput from "@/components/chat/FollowUpInput";
-import { sampleConversations, sampleQueries } from "@/lib/sampleData";
-import { Menu, X } from "lucide-react";
+import { sampleConversations } from "@/lib/sampleData";
+import { runQuery } from "@/lib/queryEngine";
+import { Menu } from "lucide-react";
 
 export default function Chat() {
-  const [activeConversation, setActiveConversation] = useState("1");
-  const [conversations] = useState(sampleConversations);
-  const [tabs, setTabs] = useState([
-    { id: "1", title: "What is the total revenue by country?" },
-    { id: "2", title: "Filter that by 2024" },
-    { id: "3", title: "Top 10 customers by spend" },
-  ]);
-  const [activeTab, setActiveTab] = useState("1");
-  const [resultsTab, setResultsTab] = useState("Results");
+  const [mode, setMode] = useState("Hybrid");
+  const [llm, setLlm] = useState("OpenAI");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isNewQuery = !sampleQueries[activeTab] && tabs.find((t) => t.id === activeTab)?.title === "New Query";
-  const currentQuery = sampleQueries[activeTab];
+  // tabs: [{id, title}]
+  const [tabs, setTabs] = useState([]);
+  const [activeTab, setActiveTab] = useState("dashboard");
 
-  const handleSelectConversation = useCallback((id) => {
-    setActiveConversation(id);
-    if (sampleQueries[id]) {
-      setActiveTab(id);
-      if (!tabs.find((t) => t.id === id)) {
-        const conv = conversations.find((c) => c.id === id);
-        setTabs((prev) => [...prev, { id, title: conv?.title || "New Query" }]);
+  // queryResults: { [tabId]: { question, ...llmResponse } | "loading" }
+  const [queryResults, setQueryResults] = useState({});
+
+  // conversation history for sidebar
+  const [conversations, setConversations] = useState(sampleConversations);
+
+  const handleAskQuestion = useCallback(async (question) => {
+    const id = Date.now().toString();
+
+    // Add tab and set loading
+    setTabs((prev) => [...prev, { id, title: question }]);
+    setActiveTab(id);
+    setQueryResults((prev) => ({ ...prev, [id]: "loading" }));
+
+    // Add to conversation history
+    setConversations((prev) => [
+      { id, title: question, time: "just now" },
+      ...prev,
+    ]);
+
+    try {
+      const result = await runQuery(question, mode, llm);
+      setQueryResults((prev) => ({
+        ...prev,
+        [id]: { question, ...result },
+      }));
+      // Update tab title to a shorter version if needed
+      if (question.length > 40) {
+        setTabs((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, title: question } : t))
+        );
       }
+    } catch (err) {
+      setQueryResults((prev) => ({
+        ...prev,
+        [id]: {
+          question,
+          intent: "Error",
+          pipeline: mode === "Hybrid" ? "Hybrid (RAG + TAG)" : "Standard (RAG)",
+          sql_query: "",
+          explanation: `Error: ${err.message}`,
+          columns: [],
+          rows: [],
+          stats: [],
+        },
+      }));
     }
-    setSidebarOpen(false);
-  }, [tabs, conversations]);
+  }, [mode, llm]);
 
   const handleCloseTab = useCallback((id) => {
-    const closingTab = tabs.find((t) => t.id === id);
-    const isNew = closingTab?.title === "New Query" && !sampleQueries[id];
-
     setTabs((prev) => {
       const next = prev.filter((t) => t.id !== id);
       if (activeTab === id) {
-        if (isNew || next.length === 0) {
-          setActiveTab("dashboard");
-        } else {
-          setActiveTab(next[0].id);
-        }
+        setActiveTab(next.length > 0 ? next[next.length - 1].id : "dashboard");
       }
       return next;
     });
-  }, [activeTab, tabs]);
+    setQueryResults((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  }, [activeTab]);
 
   const handleAddTab = useCallback(() => {
-    const id = Date.now().toString();
-    setTabs((prev) => [...prev, { id, title: "New Query" }]);
-    setActiveTab(id);
+    setActiveTab("dashboard");
   }, []);
 
-  const handleFollowUp = useCallback((question) => {
-    const id = Date.now().toString();
-    setTabs((prev) => [...prev, { id, title: question }]);
-    setActiveTab(id);
-  }, []);
+  const handleSelectConversation = useCallback((convId) => {
+    // If this conversation has a loaded result, switch to it
+    if (queryResults[convId]) {
+      if (!tabs.find((t) => t.id === convId)) {
+        const conv = conversations.find((c) => c.id === convId);
+        setTabs((prev) => [...prev, { id: convId, title: conv?.title || "Query" }]);
+      }
+      setActiveTab(convId);
+    }
+    setSidebarOpen(false);
+  }, [queryResults, tabs, conversations]);
+
+  const currentResult = queryResults[activeTab];
+  const isLoading = currentResult === "loading";
+  const isDashboard = activeTab === "dashboard" || !currentResult;
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
-      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -81,24 +115,27 @@ export default function Chat() {
       `}>
         <Sidebar
           conversations={conversations}
-          activeConversation={activeConversation}
+          activeConversation={activeTab}
           onSelectConversation={handleSelectConversation}
           onNewQuestion={handleAddTab}
         />
       </div>
 
-      {/* Main Content */}
+      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile menu button */}
         <div className="lg:hidden flex items-center gap-2 px-4 pt-3">
           <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-secondary rounded-lg">
             <Menu className="w-5 h-5" />
           </button>
         </div>
 
-        <TopBar />
+        <TopBar
+          mode={mode}
+          onModeChange={setMode}
+          llm={llm}
+          onLlmChange={setLlm}
+        />
 
-        {/* Query Tabs */}
         <QueryTabs
           tabs={tabs}
           activeTab={activeTab}
@@ -107,9 +144,9 @@ export default function Chat() {
           onAddTab={handleAddTab}
         />
 
-        {/* Content Area */}
+        {/* Content */}
         <div className="flex-1 flex flex-col overflow-hidden bg-card mx-5 mb-0 rounded-t-xl border border-b-0 border-border shadow-sm">
-          {activeTab === "dashboard" || !currentQuery ? (
+          {isDashboard ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-6 p-10">
               <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -119,35 +156,38 @@ export default function Chat() {
               <div className="text-center">
                 <h2 className="text-xl font-semibold text-foreground mb-2">Welcome to Chat2DB</h2>
                 <p className="text-muted-foreground text-sm max-w-sm">
-                  Ask a question about your database to get started, or select a conversation from the history.
+                  Ask a question in natural language and the AI will generate SQL, run it, and explain the results using <strong>{mode}</strong> mode with <strong>{llm}</strong>.
                 </p>
               </div>
-              <FollowUpInput onSend={handleFollowUp} />
+              <div className="w-full max-w-lg">
+                <FollowUpInput onSend={handleAskQuestion} placeholder="e.g. What is the total revenue by country?" />
+              </div>
+              {/* Example questions */}
+              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                {[
+                  "What is the total revenue by country?",
+                  "Top 10 customers by spend",
+                  "Best selling genres",
+                  "Monthly revenue trend",
+                ].map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => handleAskQuestion(q)}
+                    className="text-xs px-3 py-1.5 bg-secondary hover:bg-accent hover:text-accent-foreground rounded-full border border-border transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
-            <>
-              <QuestionHeader
-                question={currentQuery.question}
-                time={currentQuery.time}
-                intent={currentQuery.intent}
-                mode={currentQuery.mode}
-                sources={currentQuery.sources}
-              />
-              <StatsCards stats={currentQuery.stats} />
-              <ResultsTabs activeTab={resultsTab} onTabChange={setResultsTab} />
-              {resultsTab === "Results" && currentQuery.data ? (
-                <DataTable
-                  columns={currentQuery.columns}
-                  data={currentQuery.data}
-                  totalLabel={currentQuery.totalLabel}
-                />
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-                  {resultsTab} view coming soon
-                </div>
-              )}
-              <FollowUpInput onSend={handleFollowUp} />
-            </>
+            <QueryView
+              queryData={isLoading ? null : currentResult}
+              loading={isLoading}
+              onFollowUp={handleAskQuestion}
+              mode={mode}
+              llm={llm}
+            />
           )}
         </div>
       </div>

@@ -1,15 +1,82 @@
-import React from "react";
-import { Info, Database, ChevronDown } from "lucide-react";
+import React, { useState } from "react";
+import { Info, Database, ChevronDown, Cpu } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
-export default function TopBar() {
+const MODES = ["Hybrid", "Standard"];
+const LLMS = ["OpenAI", "Claude"];
+
+const MODE_LABELS = {
+  Hybrid: "Hybrid (RAG + TAG)",
+  Standard: "Standard (RAG)",
+};
+
+export default function TopBar({ mode, onModeChange, llm, onLlmChange }) {
   return (
     <div className="h-14 border-b border-border bg-card flex items-center justify-between px-5">
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground font-medium">Mode:</span>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-full border border-border">
-          <span className="text-xs font-semibold text-foreground">Hybrid (RAG + TAG)</span>
-        </div>
+
+        {/* Mode Switcher */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-full border border-border hover:bg-muted transition-colors">
+              <span className="text-xs font-semibold text-foreground">{MODE_LABELS[mode]}</span>
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            {MODES.map((m) => (
+              <DropdownMenuItem
+                key={m}
+                onClick={() => onModeChange(m)}
+                className={cn("text-xs", mode === m && "bg-accent text-accent-foreground font-semibold")}
+              >
+                <div>
+                  <div className="font-medium">{MODE_LABELS[m]}</div>
+                  <div className="text-muted-foreground text-[10px]">
+                    {m === "Hybrid" ? "RAG retrieval + TAG synthesis" : "RAG retrieval only"}
+                  </div>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Info className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-foreground" />
+
+        {/* LLM Switcher */}
+        <span className="text-sm text-muted-foreground font-medium ml-2">LLM:</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-full border border-border hover:bg-muted transition-colors">
+              <Cpu className="w-3 h-3 text-primary" />
+              <span className="text-xs font-semibold text-foreground">{llm}</span>
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-44">
+            {LLMS.map((l) => (
+              <DropdownMenuItem
+                key={l}
+                onClick={() => onLlmChange(l)}
+                className={cn("text-xs", llm === l && "bg-accent text-accent-foreground font-semibold")}
+              >
+                <div>
+                  <div className="font-medium">{l}</div>
+                  <div className="text-muted-foreground text-[10px]">
+                    {l === "OpenAI" ? "GPT-4 model" : "Claude Sonnet"}
+                  </div>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <div className="flex items-center gap-4">

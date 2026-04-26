@@ -1,11 +1,13 @@
 import React from "react";
-import { DollarSign, Globe, TrendingUp, Clock } from "lucide-react";
+import { DollarSign, Globe, TrendingUp, Clock, Users, Layers } from "lucide-react";
 
 const iconMap = {
   dollar: DollarSign,
   globe: Globe,
   trending: TrendingUp,
   clock: Clock,
+  users: Users,
+  layers: Layers,
 };
 
 const colorMap = {
