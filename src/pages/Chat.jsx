@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/chat/Sidebar";
 import TopBar from "@/components/chat/TopBar";
 import QueryTabs from "@/components/chat/QueryTabs";
@@ -14,6 +15,7 @@ import { useSavedQueries } from "@/hooks/useSavedQueries";
 import { Menu } from "lucide-react";
 
 export default function Chat() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState("Hybrid");
   const [llm, setLlm] = useState("OpenAI");
   const [database, setDatabase] = useState("chinook");
@@ -212,7 +214,10 @@ export default function Chat() {
           onSelectConversation={handleSelectConversation}
           onNewQuestion={() => { setActivePage("Dashboard"); handleAddTab(); }}
           activePage={activePage}
-          onNavigate={(page) => { setActivePage(page); setSidebarOpen(false); }}
+          onNavigate={(page) => {
+            if (page === "Evals") { navigate("/evals"); return; }
+            setActivePage(page); setSidebarOpen(false);
+          }}
           favoritesCount={favorites.length}
           savedQueriesCount={savedQueries.length}
         />

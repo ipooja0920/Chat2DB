@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, LayoutDashboard, Database, BookmarkCheck, Star, Search, LogOut, MessageSquare, MoreHorizontal } from "lucide-react";
+import { Plus, LayoutDashboard, Database, BookmarkCheck, Star, Search, LogOut, MessageSquare, MoreHorizontal, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Sidebar({ conversations, activeConversation, onSelectConversation, onNewQuestion, activePage, onNavigate, favoritesCount, savedQueriesCount }) {
@@ -8,6 +8,7 @@ export default function Sidebar({ conversations, activeConversation, onSelectCon
     { icon: Database, label: "Explore Schema" },
     { icon: BookmarkCheck, label: "Saved Queries", badge: savedQueriesCount },
     { icon: Star, label: "Favorites", badge: favoritesCount },
+    { icon: FlaskConical, label: "Evals" },
   ];
   return (
     <div className="w-[240px] min-w-[240px] h-screen bg-sidebar flex flex-col border-r border-sidebar-border">

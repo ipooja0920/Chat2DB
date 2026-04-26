@@ -1,0 +1,103 @@
+{
+  "name": "EvalResult",
+  "type": "object",
+  "properties": {
+    "run_name": {
+      "type": "string",
+      "description": "Name for this eval run"
+    },
+    "database": {
+      "type": "string",
+      "description": "chinook or northwind"
+    },
+    "pipeline": {
+      "type": "string",
+      "description": "RAG, TAG, or Hybrid"
+    },
+    "llm": {
+      "type": "string",
+      "description": "OpenAI or Claude"
+    },
+    "total_cases": {
+      "type": "number"
+    },
+    "valid_sql_count": {
+      "type": "number"
+    },
+    "translatable_accuracy": {
+      "type": "number"
+    },
+    "avg_sql_similarity": {
+      "type": "number"
+    },
+    "avg_cosine_similarity": {
+      "type": "number"
+    },
+    "overall_score": {
+      "type": "number"
+    },
+    "results": {
+      "type": "array",
+      "description": "Per-question eval results",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "expected_sql": {
+            "type": "string"
+          },
+          "generated_sql": {
+            "type": "string"
+          },
+          "is_valid_sql": {
+            "type": "boolean"
+          },
+          "is_translatable": {
+            "type": "boolean"
+          },
+          "expected_translatable": {
+            "type": "boolean"
+          },
+          "translatable_correct": {
+            "type": "boolean"
+          },
+          "sql_similarity": {
+            "type": "number"
+          },
+          "result_col_sim": {
+            "type": "number"
+          },
+          "result_row_sim": {
+            "type": "number"
+          },
+          "result_total_sim": {
+            "type": "number"
+          },
+          "cosine_sim": {
+            "type": "number"
+          },
+          "explanation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "completed",
+        "failed"
+      ],
+      "default": "running"
+    }
+  },
+  "required": [
+    "run_name",
+    "database",
+    "pipeline",
+    "llm"
+  ]
+}

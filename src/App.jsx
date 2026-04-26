@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import Chat from './pages/Chat';
+import Evals from './pages/Evals';
 // Add page imports here
 
 const AuthenticatedApp = () => {
@@ -35,6 +36,7 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/" element={<Chat />} />
+      <Route path="/evals" element={<Evals />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
