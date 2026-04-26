@@ -34,36 +34,19 @@ export default function Chat() {
   // conversation history for sidebar
   const [conversations, setConversations] = useState(sampleConversations);
 
-  const handleAskQuestion = useCallback(async (question) => {
-    const id = Date.now().toString();
-
-    // Add tab and set loading
-    setTabs((prev) => [...prev, { id, title: question }]);
-    setActiveTab(id);
-    setQueryResults((prev) => ({ ...prev, [id]: "loading" }));
-
-    // Add to conversation history
-    setConversations((prev) => [
-      { id, title: question, time: "just now" },
-      ...prev,
-    ]);
-
+  const runQueryInTab = useCallback(async (question, tabId) => {
+    setQueryResults((prev) => ({ ...prev, [tabId]: "loading" }));
     try {
       const result = await runQuery(question, mode, llm);
       setQueryResults((prev) => ({
         ...prev,
-        [id]: { id, question, ...result },
+        [tabId]: { id: tabId, question, ...result },
       }));
-      // Update tab title to a shorter version if needed
-      if (question.length > 40) {
-        setTabs((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, title: question } : t))
-        );
-      }
     } catch (err) {
       setQueryResults((prev) => ({
         ...prev,
-        [id]: {
+        [tabId]: {
+          id: tabId,
           question,
           intent: "Error",
           pipeline: mode === "Hybrid" ? "Hybrid (RAG + TAG)" : "Standard (RAG)",
@@ -76,6 +59,32 @@ export default function Chat() {
       }));
     }
   }, [mode, llm]);
+
+  // New question — always opens a new tab
+  const handleAskQuestion = useCallback(async (question) => {
+    const id = Date.now().toString();
+    setTabs((prev) => [...prev, { id, title: question }]);
+    setActiveTab(id);
+    setConversations((prev) => [
+      { id, title: question, time: "just now" },
+      ...prev,
+    ]);
+    await runQueryInTab(question, id);
+  }, [runQueryInTab]);
+
+  // Follow-up — updates the current tab in place
+  const handleFollowUp = useCallback(async (question) => {
+    if (activeTab === "dashboard") {
+      await handleAskQuestion(question);
+      return;
+    }
+    setTabs((prev) => prev.map((t) => t.id === activeTab ? { ...t, title: question } : t));
+    setConversations((prev) => [
+      { id: activeTab, title: question, time: "just now" },
+      ...prev.filter((c) => c.id !== activeTab),
+    ]);
+    await runQueryInTab(question, activeTab);
+  }, [activeTab, runQueryInTab, handleAskQuestion]);
 
   const handleCloseTab = useCallback((id) => {
     setTabs((prev) => {
@@ -241,7 +250,7 @@ export default function Chat() {
             <QueryView
               queryData={isLoading ? null : currentResult}
               loading={isLoading}
-              onFollowUp={handleAskQuestion}
+              onFollowUp={handleFollowUp}
               mode={mode}
               llm={llm}
               isFavorite={!isLoading && currentResult ? isFavorite(currentResult.id) : false}
