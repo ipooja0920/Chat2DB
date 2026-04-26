@@ -1,10 +1,18 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function DataTable({ columns, data, totalLabel }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+  const [pagePickerOpen, setPagePickerOpen] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (pickerRef.current && !pickerRef.current.contains(e.target)) setPagePickerOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const totalPages = Math.ceil(data.length / perPage);
   const paginatedData = useMemo(
@@ -87,9 +95,31 @@ export default function DataTable({ columns, data, totalLabel }) {
           >
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
-          <div className="ml-2 flex items-center gap-1 px-2.5 py-1.5 border border-border rounded-lg text-xs text-muted-foreground">
-            {perPage} / page
-            <ChevronDown className="w-3 h-3" />
+          {/* Page picker */}
+          <div className="relative ml-2" ref={pickerRef}>
+            <button
+              onClick={() => setPagePickerOpen((o) => !o)}
+              className="flex items-center gap-1 px-2.5 py-1.5 border border-border rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors"
+            >
+              {totalPages} {totalPages === 1 ? "page" : "pages"}
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {pagePickerOpen && (
+              <div className="absolute bottom-full mb-1 right-0 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50 min-w-[80px]">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setCurrentPage(p); setPagePickerOpen(false); }}
+                    className={cn(
+                      "w-full text-left px-3 py-1.5 text-xs hover:bg-secondary transition-colors",
+                      currentPage === p && "bg-accent text-accent-foreground font-semibold"
+                    )}
+                  >
+                    Page {p}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
