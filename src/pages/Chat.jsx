@@ -66,7 +66,7 @@ export default function Chat() {
     appendLoadingMessage(tabId, question);
     try {
       const result = await runQuery(question, mode, llm, database);
-      const message = { id: `${tabId}-${Date.now()}`, question, ...result };
+      const message = { id: `${tabId}-${Date.now()}`, question, database, ...result };
       setQueryResults((prev) => {
         const existing = Array.isArray(prev[tabId]) ? prev[tabId] : [];
         const without = existing.filter((m) => !m._loading);

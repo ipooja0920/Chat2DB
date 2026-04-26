@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Bookmark, Trash2, AlertCircle, BookmarkX, Code2 } from "lucide-react";
+import { Bookmark, Trash2, AlertCircle, BookmarkX, Code2, Database } from "lucide-react";
+import { getDatabaseById } from "@/lib/queryEngine";
 
 const MAX_SAVED = 20;
 
@@ -96,6 +97,12 @@ function SavedQueryCard({ item, index, total, onRemove, onSelect }) {
             {item.pipeline && (
               <span className="text-[10px] px-2 py-0.5 bg-accent text-accent-foreground border border-primary/20 rounded-full font-medium">
                 {item.pipeline}
+              </span>
+            )}
+            {item.database && (
+              <span className="text-[10px] px-2 py-0.5 bg-secondary text-muted-foreground border border-border rounded-full font-medium flex items-center gap-1">
+                <Database className="w-2.5 h-2.5" />
+                {getDatabaseById(item.database).label}
               </span>
             )}
             {savedDate && (

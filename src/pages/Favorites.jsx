@@ -1,5 +1,6 @@
 import React from "react";
-import { Star, FileText, Trash2, AlertCircle, BookmarkX } from "lucide-react";
+import { Star, FileText, Trash2, AlertCircle, BookmarkX, Database } from "lucide-react";
+import { getDatabaseById } from "@/lib/queryEngine";
 import { exportFavoriteToPdf } from "@/lib/exportFavoritePdf";
 
 const MAX_FAVORITES = 20;
@@ -89,6 +90,12 @@ function FavoriteCard({ fav, index, total, onRemove, onSelect }) {
             {fav.pipeline && (
               <span className="text-[10px] px-2 py-0.5 bg-accent text-accent-foreground border border-primary/20 rounded-full font-medium">
                 {fav.pipeline}
+              </span>
+            )}
+            {fav.database && (
+              <span className="text-[10px] px-2 py-0.5 bg-secondary text-muted-foreground border border-border rounded-full font-medium flex items-center gap-1">
+                <Database className="w-2.5 h-2.5" />
+                {getDatabaseById(fav.database).label}
               </span>
             )}
             {savedDate && (
