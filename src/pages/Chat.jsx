@@ -7,7 +7,7 @@ import FollowUpInput from "@/components/chat/FollowUpInput";
 import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
 import SavedQueries from "@/pages/SavedQueries";
-import { sampleConversations } from "@/lib/sampleData";
+// sampleConversations removed — using real history only
 import { runQuery } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
@@ -31,8 +31,16 @@ export default function Chat() {
   // queryResults: { [tabId]: { question, ...llmResponse } | "loading" }
   const [queryResults, setQueryResults] = useState({});
 
-  // conversation history for sidebar
-  const [conversations, setConversations] = useState(sampleConversations);
+  // conversation history for sidebar — last 5, deduplicated
+  const [conversations, setConversations] = useState([]);
+
+  // Add/move-to-top a conversation entry, capped at 5
+  const pushConversation = useCallback((id, title) => {
+    setConversations((prev) => {
+      const filtered = prev.filter((c) => c.id !== id);
+      return [{ id, title, time: "just now" }, ...filtered].slice(0, 5);
+    });
+  }, []);
 
   const runQueryInTab = useCallback(async (question, tabId) => {
     setQueryResults((prev) => ({ ...prev, [tabId]: "loading" }));
@@ -65,12 +73,9 @@ export default function Chat() {
     const id = Date.now().toString();
     setTabs((prev) => [...prev, { id, title: question }]);
     setActiveTab(id);
-    setConversations((prev) => [
-      { id, title: question, time: "just now" },
-      ...prev,
-    ]);
+    pushConversation(id, question);
     await runQueryInTab(question, id);
-  }, [runQueryInTab]);
+  }, [runQueryInTab, pushConversation]);
 
   // Follow-up — updates the current tab in place
   const handleFollowUp = useCallback(async (question) => {
@@ -79,12 +84,9 @@ export default function Chat() {
       return;
     }
     setTabs((prev) => prev.map((t) => t.id === activeTab ? { ...t, title: question } : t));
-    setConversations((prev) => [
-      { id: activeTab, title: question, time: "just now" },
-      ...prev.filter((c) => c.id !== activeTab),
-    ]);
+    pushConversation(activeTab, question);
     await runQueryInTab(question, activeTab);
-  }, [activeTab, runQueryInTab, handleAskQuestion]);
+  }, [activeTab, runQueryInTab, handleAskQuestion, pushConversation]);
 
   const handleCloseTab = useCallback((id) => {
     setTabs((prev) => {
@@ -117,16 +119,23 @@ export default function Chat() {
   }, [isFavorite, addFavorite, removeFavorite]);
 
   const handleSelectConversation = useCallback((convId) => {
-    // If this conversation has a loaded result, switch to it
-    if (queryResults[convId]) {
-      if (!tabs.find((t) => t.id === convId)) {
-        const conv = conversations.find((c) => c.id === convId);
-        setTabs((prev) => [...prev, { id: convId, title: conv?.title || "Query" }]);
-      }
-      setActiveTab(convId);
+    const result = queryResults[convId];
+    if (!result) { setSidebarOpen(false); return; }
+
+    // Open tab if not already open
+    if (!tabs.find((t) => t.id === convId)) {
+      const conv = conversations.find((c) => c.id === convId);
+      setTabs((prev) => [...prev, { id: convId, title: conv?.title || "Query" }]);
     }
+    setActiveTab(convId);
+    setActivePage("Dashboard");
+
+    // Move to top of history (dedup)
+    const conv = conversations.find((c) => c.id === convId);
+    if (conv) pushConversation(convId, conv.title);
+
     setSidebarOpen(false);
-  }, [queryResults, tabs, conversations]);
+  }, [queryResults, tabs, conversations, pushConversation]);
 
   const handleToggleSavedQuery = useCallback((queryData) => {
     if (isSaved(queryData.id)) {
