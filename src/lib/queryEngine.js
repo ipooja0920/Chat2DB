@@ -62,7 +62,7 @@ Now provide:
 3. Key insights from the results
 
 Format your response as JSON with these fields:
-- summary: brief one-line answer
+- summary: a 1-2 sentence answer written in plain business English — no SQL terms, no technical jargon, just a clear and direct insight a business user would understand
 - intent: classify as one of "Analytical", "Lookup", "Aggregation", "Ranking", "Filter", "Trend"
 - sql_query: the SQL query
 - explanation: 2-3 sentences explaining what the query does
