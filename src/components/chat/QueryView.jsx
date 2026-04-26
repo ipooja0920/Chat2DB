@@ -46,6 +46,16 @@ export default function QueryView({ queryData, loading, onFollowUp, mode, llm })
         }
       />
       <StatsCards stats={queryData.stats} />
+
+      {/* Written answer summary */}
+      {queryData.summary && (
+        <div className="px-6 pb-4">
+          <p className="text-sm text-foreground leading-relaxed bg-accent/40 border border-accent rounded-xl px-4 py-3">
+            {queryData.summary}
+          </p>
+        </div>
+      )}
+
       <ResultsTabs activeTab={resultsTab} onTabChange={setResultsTab} />
       {resultsTab === "Results" && queryData.rows?.length > 0 ? (
         <DataTable
