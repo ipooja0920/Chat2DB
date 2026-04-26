@@ -13,6 +13,7 @@ export async function runVizAgent(question, columns, rows) {
   const sampleRows = rows.slice(0, 5);
 
   const result = await base44.integrations.Core.InvokeLLM({
+    model: "gpt_5_mini",
     prompt: `You are a Data Visualization Agent. Your job is to:
 1. Decide if a chart/graph is suitable for this data
 2. Choose the best chart type
