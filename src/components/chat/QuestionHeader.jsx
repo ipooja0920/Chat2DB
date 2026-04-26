@@ -1,5 +1,5 @@
 import React from "react";
-import { Bot, Star, MoreVertical } from "lucide-react";
+import { Bot, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function QuestionHeader({ question, time, intent, mode, sources, isFavorite, onToggleFavorite }) {
@@ -28,7 +28,7 @@ export default function QuestionHeader({ question, time, intent, mode, sources, 
                 }`}
               />
             </button>
-            <MoreVertical className="w-4 h-4 text-muted-foreground/40 cursor-pointer hover:text-foreground" />
+
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2 flex-wrap">
