@@ -318,8 +318,17 @@ export async function runQuery(question, mode, llmProvider, databaseId = "chinoo
     effectiveLlm = "OpenAI"; // gpt_5_mini maps to OpenAI in MODEL_MAP
   }
 
+  const startTime = Date.now();
+  let result;
+  
   if (mode === "Standard") {
-    return ragPipeline(question, effectiveLlm, schema, contextMessages, userFeedback);
+    result = await ragPipeline(question, effectiveLlm, schema, contextMessages, userFeedback);
+  } else {
+    result = await hybridPipeline(question, effectiveLlm, schema, contextMessages, userFeedback);
   }
-  return hybridPipeline(question, effectiveLlm, schema, contextMessages, userFeedback);
+
+  // Add execution time to result
+  result.execution_time_ms = Math.round(Date.now() - startTime);
+  
+  return result;
 }
