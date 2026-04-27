@@ -131,7 +131,7 @@ npm run dev
 ## Features
 
 - 🧠 **Natural Language to SQL** — Ask in plain English, get SQL back
-- ⚡ **Multiple AI Pipelines** — RAG, TAG, and Hybrid modes
+- ⚡ **Multiple AI Pipelines** — RAG and Hybrid (RAG + TAG) modes
 - 🤖 **LLM Choice** — Switch between OpenAI GPT-4 and Claude Sonnet
 - 🗄️ **Multi-Database** — Chinook (music store) and Northwind (trading company)
 - 📊 **Auto Charts** — AI picks the best chart type for your data
@@ -186,4 +186,4 @@ Chat2DB includes a built-in evaluation system to benchmark how well each pipelin
 - **Chinook** — 10 test cases covering artists, revenue, genre aggregations, and non-translatable questions
 - **Northwind** — 8 test cases covering products, orders, employees, and non-translatable questions
 
-> **Note:** Each test case makes one LLM call using your configured API keys (OpenAI or Anthropic). Costs are proportional to the number of test cases selected.
+> **Note:** Each test case makes one LLM call using our configured API keys (OpenAI or Anthropic). Costs are proportional to the number of test cases selected.
