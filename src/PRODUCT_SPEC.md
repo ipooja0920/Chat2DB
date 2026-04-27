@@ -169,33 +169,78 @@ Most people who need insights from databases cannot write SQL. Even analysts who
 
 ## 6. AI Pipeline Architecture
 
-### Pipeline 1: RAG (Retrieval-Augmented Generation)
+### Full Query Execution Flow (All Pipelines)
+
+Every query — regardless of pipeline — follows this top-level sequence:
 
 ```
-User Question
+User submits question
+      │
+      ▼
+[STEP 1 — Question Classifier]  ← lib/questionClassifier.js
+  Model: gpt_5_mini (always)
+  Input: Question + DB Schema
+  Output: { query_type, recommended_model, reasoning }
+  Decision: Use gpt_5_mini (simple) or gpt_5/claude_sonnet_4_6 (complex)?
+      │
+      ▼
+[STEP 2 — Schema Cache Lookup]  ← getCachedSchema()
+  Returns cached DDL schema string (no LLM call)
+      │
+      ▼
+[STEP 3 — Conversation Context Builder]
+  Takes last 4 Q&A turns from conversation history
+  Formats as plain-text context string for the prompt
+      │
+      ▼
+[STEP 4 — Query Pipeline]  (model chosen by classifier)
+  ├─ Standard mode → ragPipeline()   (2 LLM calls)
+  └─ Hybrid mode  → hybridPipeline() (1 LLM call)
+      │
+      ▼
+[STEP 5 — Cost Logger]  ← logQueryCost() [fire-and-forget]
+  Logs token estimates, cost, latency to QueryLog entity
+      │
+      ▼
+Result rendered in UI
+```
+
+---
+
+### Pipeline 1: Standard / RAG (Retrieval-Augmented Generation)
+
+Triggered when mode = "Standard". Makes **2 sequential LLM calls**.
+
+```
+[After Classifier + Schema + Context steps above]
       │
       ▼
 [LLM Call 1 — SQL Generation]
-  Input: Schema + Question
+  Model: classifier-recommended model
+  Input: Schema + Question + Conversation Context + Feedback
   Output: { sql_query, relevant_tables }
       │
       ▼
 [LLM Call 2 — Answer Generation]
-  Input: SQL + Tables + Schema + Question
-  Output: { summary, intent, columns, rows, stats, explanation }
+  Model: same as Call 1
+  Input: SQL + relevant_tables + Schema + Conversation Context
+  Output: { rewritten_query, summary, intent, sql_query,
+            explanation, columns, rows, stats }
       │
       ▼
 Rendered Result
 ```
 
-**Use case:** Standard queries, simpler joins, direct lookups.
+**Total LLM calls per query: 2 (classifier) + 2 (pipeline) = 3**
 
 ---
 
 ### Pipeline 2: TAG (Table-Augmented Generation)
 
+> **Note:** TAG is available as an eval pipeline option but is not currently exposed in the Chat UI (only Standard and Hybrid). Makes **2 sequential LLM calls**.
+
 ```
-User Question
+[After Classifier + Schema steps above]
       │
       ▼
 [LLM Call 1 — SQL Synthesis]
@@ -205,39 +250,39 @@ User Question
       ▼
 [LLM Call 2 — Answer + Data Generation]
   Input: SQL + Query Plan + Schema
-  Output: { summary, intent, columns, rows, stats, explanation }
+  Output: { summary, intent, sql_query, explanation, columns, rows, stats }
       │
       ▼
 Rendered Result
 ```
 
-**Use case:** Complex multi-table queries, aggregations, ranking.
+**Total LLM calls per query: 2 (classifier) + 2 (pipeline) = 3**
 
 ---
 
 ### Pipeline 3: Hybrid (RAG + TAG) — DEFAULT
 
+Triggered when mode = "Hybrid". Makes **1 single LLM call** combining both phases.
+
 ```
-User Question
+[After Classifier + Schema + Context steps above]
       │
       ▼
 [Single LLM Call — Hybrid Synthesis]
-  Input: Schema + Question
+  Model: classifier-recommended model
+  Input: Schema + Question + Conversation Context + Feedback
   Internally:
     - RAG Phase: retrieve schema context, identify intent & domain
     - TAG Phase: synthesize optimal SQL using table augmentation
     - Combine: produce accurate, comprehensive answer
-  Output: {
-    summary, intent, sql_query, explanation,
-    columns, rows, stats,
-    sources_count, tables_count
-  }
+  Output: { rewritten_query, summary, intent, sql_query, explanation,
+            columns, rows, stats, sources_count, tables_count }
       │
       ▼
 Rendered Result
 ```
 
-**Use case:** All queries by default. Best accuracy and explainability.
+**Total LLM calls per query: 1 (classifier) + 1 (pipeline) = 2**
 
 ---
 
@@ -267,61 +312,77 @@ Query Result (columns + rows)
 
 ## 7. Agents & LLM Usage
 
+### Agent Execution Order (per query)
+
+Every user question triggers agents in this exact order:
+
+| Order | Agent | File | Model | When |
+|-------|-------|------|-------|------|
+| **1st** | Question Classifier | `lib/questionClassifier.js` | `gpt_5_mini` (always) | Every query — determines routing |
+| **2nd** | SQL Generation Agent | `lib/queryEngine.js` | Classifier-chosen | Standard & TAG pipelines only |
+| **2nd** | Hybrid Synthesis Agent | `lib/queryEngine.js` | Classifier-chosen | Hybrid pipeline (replaces steps 2+3) |
+| **3rd** | Answer Generation Agent | `lib/queryEngine.js` | Same as SQL agent | Standard & TAG pipelines only |
+| **On-demand** | Visualization Agent (vizAgent) | `lib/vizAgent.js` | `gpt_5_mini` | When user opens Chart tab (lazy) |
+| **On-demand** | Anomaly Detection Agent | `lib/anomalyAgent.js` | `gpt_5_mini` | When user opens Anomalies tab (lazy) |
+
 ### Multi-Turn Context Architecture
-- **Conversation History in Prompts**: Previous 4 query-answer pairs are injected as context
-- **Feedback Integration**: User feedback (positive/negative) is included in the prompt for subsequent queries
+- **Conversation History in Prompts**: Previous 4 query-answer pairs are injected as context into Step 2/3
+- **Feedback Integration**: User feedback (positive/negative) is included in the pipeline prompt for subsequent queries
 - **Dynamic Rewriting**: LLM generates a "rewritten_query" field explaining how it interpreted the user's question
 
-## 8. Agents & LLM Usage (Original)
+## 8. Agents & LLM Usage (Detail)
 
-### Agent 1: SQL Generation Agent (RAG/TAG pipelines)
-- **Role:** Translates natural language to SQL
-- **Model:** GPT-4 or Claude Sonnet (user-selected)
-- **Input:** Database schema (DDL) + user question
-- **Output:** Validated SQL SELECT query + relevant tables
-- **Constraints:** Read-only (SELECT only), schema-bound
-
-### Agent 2: Answer Generation Agent (RAG/TAG pipelines)
-- **Role:** Generates structured business answers from SQL context
-- **Model:** GPT-4 or Claude Sonnet (user-selected)
-- **Input:** SQL query + tables + schema + question
-- **Output:** summary, intent, columns, rows, stats, explanation
-- **Format:** Strict JSON schema enforced
-
-### Agent 3: Hybrid Synthesis Agent (Hybrid pipeline)
-- **Role:** Combines RAG retrieval + TAG synthesis in one pass
-- **Model:** GPT-4 or Claude Sonnet (user-selected)
-- **Input:** Schema + question
-- **Output:** Full response JSON including sources_count, tables_count
-- **Performance:** Single LLM call (more efficient than 2-call pipelines)
-
-### Agent 4: Visualization Agent (vizAgent) — `lib/vizAgent.js`
-- **Role:** Determines optimal chart type and axis mapping
-- **Model:** `gpt_5_mini` (lightweight)
-- **Input:** Column names, data types, sample rows, original question
-- **Output:** Chart config (type, x_key, y_keys, title, suitable flag)
-- **Rules enforced:**
-  - Pie chart only for ≤ 8 categorical slices
-  - Line/Area for time-series data
-  - Bar for comparisons
-  - Scatter for correlation
-
-### Agent 5: Question Classifier
-- **Role:** Analyzes user's question and recommends the best LLM model for SQL generation
-- **Model:** `gpt_5_mini` (lightweight classification)
+### Agent 1: Question Classifier — `lib/questionClassifier.js` — RUNS FIRST ON EVERY QUERY
+- **Role:** Analyzes the user's question and recommends the best LLM model before the query pipeline runs
+- **Model:** `gpt_5_mini` (always — lightweight classification only)
 - **Input:** User question + database schema
-- **Output:** query_type, recommended_model, reasoning
+- **Output:** `{ query_type, recommended_model, reasoning }`
 - **Query types classified:**
   - `schema_lookup`: Simple schema questions (what tables exist, show columns)
   - `simple_filter`: Basic SELECT with WHERE/ORDER BY
   - `aggregation`: GROUP BY queries
   - `complex_join`: Multiple table joins with filtering
   - `complex_analytical`: Advanced analytics with aggregations
-- **Model routing:**
-  - `gpt_5_mini` recommended for schema lookups and simple queries (fast, cheap)
-  - `gpt_5` or `claude_sonnet_4_6` for complex multi-join and advanced analytics (accuracy-critical)
+- **Model routing decision:**
+  - `gpt_5_mini` → schema lookups and simple queries (fast, cheap)
+  - `gpt_5` or `claude_sonnet_4_6` → complex multi-join and analytical queries (accuracy-critical)
+- **Runs before:** Everything else. Its output determines which model the pipeline uses.
 
-### Agent 6: Anomaly Detection Analyst (anomalyAgent)
+### Agent 2: SQL Generation Agent (Standard/RAG pipeline) — `lib/queryEngine.js`
+- **Role:** Translates natural language to SQL (first of 2 calls in Standard mode)
+- **Model:** Classifier-recommended model (gpt_5_mini, gpt_5, or claude_sonnet_4_6)
+- **Input:** Database schema (DDL) + question + conversation context
+- **Output:** `{ sql_query, relevant_tables }`
+- **Constraints:** Read-only (SELECT only), schema-bound
+
+### Agent 3: Answer Generation Agent (Standard/RAG pipeline) — `lib/queryEngine.js`
+- **Role:** Generates structured business answers from the SQL context (second of 2 calls in Standard mode)
+- **Model:** Same as Agent 2
+- **Input:** SQL query + relevant_tables + schema + question + conversation context
+- **Output:** `{ rewritten_query, summary, intent, sql_query, explanation, columns, rows, stats }`
+- **Format:** Strict JSON schema enforced
+
+### Agent 4: Hybrid Synthesis Agent (Hybrid pipeline) — `lib/queryEngine.js`
+- **Role:** Combines RAG retrieval + TAG synthesis in a **single** LLM call (replaces Agents 2+3)
+- **Model:** Classifier-recommended model
+- **Input:** Schema + question + conversation context + user feedback
+- **Output:** Full response JSON including `rewritten_query`, `sources_count`, `tables_count`
+- **Performance:** 1 LLM call vs. 2 for Standard — more efficient for the default pipeline
+
+### Agent 5: Visualization Agent (vizAgent) — `lib/vizAgent.js` — ON-DEMAND
+- **Role:** Determines optimal chart type and axis mapping
+- **Model:** `gpt_5_mini` (lightweight)
+- **Triggered:** Lazily when user opens the Chart tab (not on every query)
+- **Pre-check:** `lib/chartHeuristics.js` runs first client-side; rejects unsuitable data without LLM call
+- **Input:** Column names, data types, 5 sample rows, original question
+- **Output:** `{ chart_type, x_key, y_keys, title, suitable }`
+- **Rules enforced:**
+  - Pie chart only for ≤ 8 categorical slices
+  - Line/Area for time-series data
+  - Bar for comparisons
+  - Scatter for correlation
+
+### Agent 6: Anomaly Detection Analyst (anomalyAgent) — `lib/anomalyAgent.js` — ON-DEMAND
 - **Role:** Identifies outliers, spikes, drops, gaps, and concentration patterns in query result data
 - **Model:** `gpt_5_mini` (lightweight)
 - **Input:** Original question + column schema + up to 20 sample rows
