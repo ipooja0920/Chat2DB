@@ -13,7 +13,7 @@ Demo : https://drive.google.com/drive/u/2/folders/1xDH0A_1ai49FuV9e8O05ecEJYm2UX
 
 Evals :- 
 
-<img width="642" height="129" alt="Screenshot 2026-04-27 at 2 31 06 PM" src="https://github.com/user-attachments/assets/555f63cc-2a66-4d4b-b801-573d0025fbdc" />
+<img width="1433" height="701" alt="Screenshot 2026-04-27 at 3 06 25 PM" src="https://github.com/user-attachments/assets/a7602419-946f-4c99-977f-23d62d2d11e3" />
 
 
 
