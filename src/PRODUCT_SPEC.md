@@ -422,7 +422,11 @@ Every user question triggers agents in this exact order:
 
 ### Why Single-Agent Hybrid Over Multi-Agent Architecture
 
-Chat2DB deliberately uses a **single-pass Hybrid pipeline** rather than multiple specialized agents working in parallel. Here's the rationale:
+**Core Query Execution:** Chat2DB deliberately uses a **single-pass Hybrid pipeline** for SQL generation rather than multiple specialized agents working in parallel. 
+
+**Supplementary Features:** The app also includes lightweight on-demand agents (vizAgent, anomalyAgent) that run only when users open specific tabs — these are not part of the core pipeline orchestration.
+
+**Rationale for single-agent core:**
 
 | Consideration | Single Agent (Chosen) | Multi-Agent Alternative |
 |---|---|---|
