@@ -1,9 +1,15 @@
 # Chat2DB — Extensive Product Specification
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** April 2026  
 **Author:** Product & Engineering  
 **Status:** Active Development  
+
+### Changelog
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.1 | April 27, 2026 | Fixed localStorage persistence bug for Favorites & Saved Queries; added localStorage persistence for Conversation History; refactored Eval runs to fire-and-forget with 5s polling to prevent timeout failures |
+| 1.0 | April 2026 | Initial release |
 
 ---
 
@@ -121,6 +127,8 @@ Most people who need insights from databases cannot write SQL. Even analysts who
 - Follow-up questions append to the active tab's thread
 - Each message in a thread is independently rendered
 - Last 5 conversation sessions stored in sidebar history
+- **Persisted across navigation and page refreshes** via localStorage (`chat2db_conversations` key)
+- History is cleared when the user switches databases (to prevent cross-DB contamination)
 
 ### 5.7 Data Visualization
 - AI agent (`vizAgent`) analyzes result columns and rows
@@ -130,14 +138,14 @@ Most people who need insights from databases cannot write SQL. Even analysts who
 ### 5.8 Favorites System
 - Star any query result to save it
 - Maximum 20 favorites (FIFO overflow with user confirmation)
-- Persisted in browser localStorage
+- Persisted in browser localStorage (`chat2db_favorites`) — **survives page refreshes and navigation between pages**
 - Exportable to PDF
 
 ### 5.9 Saved Queries System
 - Save SQL queries from the SQL tab for reuse
 - Maximum 20 saved queries (FIFO overflow)
 - Shows question, SQL, pipeline, and database badge
-- Persisted in browser localStorage
+- Persisted in browser localStorage (`chat2db_saved_queries`) — **survives page refreshes and navigation between pages**
 
 ### 5.10 PDF Export
 - Full results export: summary, stats, data table, SQL, explanation
@@ -422,9 +430,9 @@ Chat2DB deliberately uses a **single-pass Hybrid pipeline** rather than multiple
 | LLM selection | `Chat.jsx` state | Session only |
 | Query tabs | `Chat.jsx` state | Session only |
 | Query results (per tab) | `Chat.jsx` state | Session only |
-| Conversation history | `Chat.jsx` state | Session only |
-| Favorites | `useFavorites` hook | localStorage |
-| Saved Queries | `useSavedQueries` hook | localStorage |
+| Conversation history | `Chat.jsx` state + localStorage | **Persisted** (last 5 entries, key: `chat2db_conversations`) |
+| Favorites | `useFavorites` hook | **Persisted** (localStorage, key: `chat2db_favorites`) |
+| Saved Queries | `useSavedQueries` hook | **Persisted** (localStorage, key: `chat2db_saved_queries`) |
 
 ### Component Hierarchy
 ```
@@ -616,6 +624,18 @@ The Deno backend function:
 
 > **Note:** The backend function intentionally skips `auth.me()` user verification and uses `asServiceRole` for all LLM and entity operations. This is because eval runs are invoked from a trusted admin context and the function call itself doesn't require per-user identity.
 
+### 13.5.1 Async Fire-and-Forget Execution Model
+
+Eval runs are invoked using a **fire-and-forget pattern** on the frontend to avoid HTTP timeout failures on large test suites:
+
+1. Frontend creates the `EvalResult` record with `status: "running"` and immediately navigates to History
+2. `base44.functions.invoke("runEvals", {...})` is called **without `await`** — the request runs in the background
+3. Frontend polls the `EvalResult` entity every **5 seconds** to detect status changes (`running` → `completed` / `failed`)
+4. When the poll detects a non-running status, polling stops and `runningId` is cleared
+5. If the function call rejects (e.g. network error), the frontend checks the current record status and marks it `failed` only if it was still `running` (to avoid overwriting a manual Terminate)
+
+This prevents the previous issue where awaiting the full eval run would trigger a function timeout on runs with many test cases.
+
 ### 13.6 Results UI
 
 | View | Description |
@@ -650,10 +670,11 @@ Users can terminate a running eval at any time via the **Terminate** button on t
 |------|---------|-----|----------|
 | Favorites | localStorage | `chat2db_favorites` | 20 items |
 | Saved Queries | localStorage | `chat2db_saved_queries` | 20 items |
+| Conversation History | localStorage | `chat2db_conversations` | Last 5 entries |
 | Active session state | React in-memory | — | Session lifetime |
-| Conversation history | React in-memory | — | Last 5 entries |
+| Query tabs & results | React in-memory | — | Session lifetime |
 
-> **Note:** All session data (tabs, results, conversations) is lost on page refresh. Only Favorites and Saved Queries persist via localStorage.
+> **Note:** Favorites, Saved Queries, and Conversation History all persist across page refreshes and navigation (including switching to Evals or Cost Dashboard pages). Only active query tabs and their raw result data are lost on page refresh. Conversation History is cleared when the user switches databases.
 
 ---
 
@@ -803,7 +824,7 @@ Early iterations exhibited slow execution due to:
 | Schema-bound | LLM can only query tables defined in the injected schema |
 | No real DB | Data is LLM-simulated (not a live database connection) |
 | localStorage limit | Favorites/SavedQueries capped at 20 each |
-| Session state | Tabs and results lost on page refresh |
+| Session state | Active tabs and raw results lost on page refresh; history/favorites/saved queries persist |
 | LLM latency | Hybrid pipeline: ~3–8s per query depending on complexity (post-optimization) |
 | Chart suitability | Not all datasets are chartable; vizAgent may mark as unsuitable |
 
@@ -842,7 +863,7 @@ Early iterations exhibited slow execution due to:
 | Feature | Priority | Description |
 |---------|----------|-------------|
 | Live DB connection | High | Connect to real PostgreSQL/MySQL databases via connection string |
-| Query history persistence | High | Save full session history to backend, not just localStorage |
+| Query history persistence | Medium | Save full tab/result state to backend for cross-device sync (localStorage already persists history/favorites/saved queries) |
 | User authentication | High | Multi-user support with personal workspaces |
 | More databases | Medium | AdventureWorks, Sakila, custom schemas |
 | Schema explorer | Medium | Visual ERD diagram of the selected database |
