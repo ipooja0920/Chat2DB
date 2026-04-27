@@ -610,9 +610,11 @@ Each test case contains:
 
 The Deno backend function:
 1. Receives `eval_run_id`, `test_cases`, `pipeline`, `llm`, `database`, `db_schema`
-2. For each test case, calls the LLM to generate SQL (same model as the main query engine)
+2. For each test case, calls the LLM via `asServiceRole.integrations` (no user auth required — runs as service role)
 3. Computes all metrics using pure JavaScript ports of Python evaluation tools (SequenceMatcher, TF-IDF cosine)
 4. Aggregates metrics and updates the `EvalResult` entity record with `status: "completed"`
+
+> **Note:** The backend function intentionally skips `auth.me()` user verification and uses `asServiceRole` for all LLM and entity operations. This is because eval runs are invoked from a trusted admin context and the function call itself doesn't require per-user identity.
 
 ### 13.6 Results UI
 
@@ -622,7 +624,19 @@ The Deno backend function:
 | **Drilldown View** | Score summary bars + bar chart + per-case expandable rows |
 | **Per-Case Row** | Expected SQL vs. Generated SQL, individual metric scores, error explanation |
 
-### 13.7 Data Persistence
+**History Card Behavior:**
+- **Completed runs**: Show overall score badge and timestamp; clickable to open drilldown
+- **Running runs**: Show animated "Running..." indicator + **Terminate** button to cancel and mark as failed; timestamp is hidden
+- **Failed runs**: Show failure icon; timestamp is hidden
+
+### 13.7 Terminating an Eval Run
+
+Users can terminate a running eval at any time via the **Terminate** button on the History card:
+- Immediately marks the `EvalResult` record as `status: "failed"`
+- Clears the `runningId` tracking state in the frontend
+- The partial results (if any) are discarded; the run appears as failed in History
+
+### 13.8 Data Persistence
 
 - Each eval run creates an `EvalResult` entity record (persisted to Base44 database)
 - Run history survives page refreshes (unlike chat session data)
