@@ -119,7 +119,7 @@ function SavedQueryCard({ item, index, total, onRemove, onSelect }) {
             <Code2 className="w-3 h-3 text-muted-foreground" />
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">SQL</span>
           </div>
-          <pre className="bg-secondary/60 rounded-lg px-3 py-2 text-[11px] font-mono text-foreground line-clamp-3 whitespace-pre-wrap border border-border/50">
+          <pre className="bg-secondary/60 rounded-lg px-3 py-2 text-[11px] font-mono text-foreground whitespace-pre-wrap border border-border/50 max-h-40 overflow-y-auto">
             {item.sql_query}
           </pre>
         </div>
