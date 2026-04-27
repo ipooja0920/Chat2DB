@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { appParams } from "@/lib/app-params";
 import { EVAL_DATASETS, PIPELINES, LLMS } from "@/lib/evalDatasets";
 import { getDatabaseById, DATABASES } from "@/lib/queryEngine";
 import EvalRunConfig from "@/components/evals/EvalRunConfig";
@@ -41,20 +42,30 @@ export default function Evals() {
     setView("history");
     await loadHistory();
 
-    // Fire-and-forget: don't await — poll for completion instead
-    base44.functions.invoke("runEvals", {
-      eval_run_id: record.id,
-      test_cases: testCases,
-      pipeline,
-      llm,
-      database,
-      db_schema: dbSchema,
-      run_name: runName
+    // Fire-and-forget using native fetch with keepalive:true so the request
+    // survives page navigation / component unmount (axios gets cancelled, fetch doesn't).
+    const fnUrl = `${appParams.appBaseUrl || ""}/api/v3/functions/runEvals`;
+    const token = appParams.token || localStorage.getItem("base44_access_token");
+    fetch(fnUrl, {
+      method: "POST",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        eval_run_id: record.id,
+        test_cases: testCases,
+        pipeline,
+        llm,
+        database,
+        db_schema: dbSchema,
+        run_name: runName,
+      }),
     }).then(async () => {
       setRunningId(null);
       await loadHistory();
     }).catch(async () => {
-      // Mark as failed only if still "running" (not manually terminated)
       try {
         const current = await base44.entities.EvalResult.filter({ id: record.id });
         if (current?.[0]?.status === "running") {
