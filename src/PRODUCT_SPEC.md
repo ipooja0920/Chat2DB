@@ -69,7 +69,7 @@ Evals :-
 - Provides plain-English explanations
 - Allows export of results to PDF
 
-The application is built on a React + Deno BaaS platform and leverages **OpenAI GPT-4** and **Anthropic Claude Sonnet** as LLM backends, with three distinct AI reasoning pipelines: **RAG**, **TAG (standalone)- only used in eval/testing)**, and **Hybrid**.
+The application is built on a React + Deno BaaS platform and leverages **OpenAI GPT-4** and **Anthropic Claude Sonnet** as LLM backends, with three distinct AI reasoning pipelines: **RAG**, **TAG (standalone)- only used in eval/testing)**, and **Hybrid (RAG + TAG)**.
 
 ---
 
