@@ -5,8 +5,10 @@
 **Author:** Product & Engineering  
 **Status:** Active Development  
 
-Demo : 
 
+## Demo Video
+
+[![Watch the demo](assets/demo-thumbnail.png)](https://drive.google.com/file/d/1gdhwztk1LKeYzTRks7ENPs_cv1gWPnVT/view?usp=drive_link)
 
 
 <img width="1033" height="597" alt="Screenshot 2026-04-26 at 11 32 55 PM" src="https://github.com/user-attachments/assets/782d3e6d-e15f-4d58-ae33-e4dda9c9faf5" />
