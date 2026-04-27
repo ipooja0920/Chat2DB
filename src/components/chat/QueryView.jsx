@@ -6,6 +6,7 @@ import DataTable from "./DataTable";
 import FollowUpInput from "./FollowUpInput";
 import ChartView from "./ChartView";
 import ContextView from "./ContextView";
+import AnomalyView from "./AnomalyView";
 import FeedbackSection from "./FeedbackSection";
 import { Loader2, Copy, Check, BookmarkPlus } from "lucide-react";
 import { exportQueryToPdf } from "@/lib/exportPdf";
@@ -79,6 +80,8 @@ function MessageBlock({ queryData, isFavorite, onToggleFavorite, isSaved, onSave
         </div>
       ) : resultsTab === "Context" ? (
         <ContextView queryData={queryData} />
+      ) : resultsTab === "Anomalies" ? (
+        <AnomalyView question={queryData.question} columns={queryData.columns || []} rows={queryData.rows || []} />
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           {resultsTab} view coming soon

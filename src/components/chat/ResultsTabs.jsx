@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Download, Maximize2, Minimize2, ChevronDown, FileText, Table2, BarChart3, Code2, BookOpen, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const tabs = ["Results", "Chart", "SQL", "Explanation", "Context"];
+const tabs = ["Results", "Chart", "SQL", "Explanation", "Context", "Anomalies"];
 
 export default function ResultsTabs({ activeTab, onTabChange, onExportPdf, onToggleExpand, expanded }) {
   const [downloadOpen, setDownloadOpen] = useState(false);
