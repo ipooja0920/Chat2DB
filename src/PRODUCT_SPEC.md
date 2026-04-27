@@ -254,7 +254,7 @@ Triggered when mode = "Standard". Makes **2 sequential LLM calls**.
 Rendered Result
 ```
 
-**Total LLM calls per query: 2 (classifier) + 2 (pipeline) = 3**
+**Total LLM calls per query: 1 (classifier) + 2 (pipeline) = 3**
 
 ---
 
@@ -279,7 +279,7 @@ Rendered Result
 Rendered Result
 ```
 
-**Total LLM calls per query: 2 (classifier) + 2 (pipeline) = 3**
+**Total LLM calls per query: 1 (classifier) + 2 (pipeline) = 3**
 
 ---
 
