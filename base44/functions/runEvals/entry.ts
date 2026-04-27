@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClient } from 'npm:@base44/sdk@0.8.25';
 
 // ─── SQL Utility Functions (port of evaltools.py) ─────────────────────────────
 
@@ -148,7 +148,7 @@ Rules:
 - Use only tables/columns that exist in the schema
 - Only generate SELECT queries`;
 
-  const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+  const result = await base44.integrations.Core.InvokeLLM({
     model,
     prompt,
     response_json_schema: {
@@ -170,7 +170,12 @@ Rules:
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
+    // Use service-role client initialized from env — not tied to the user's browser session.
+    // This means the eval run survives page navigation/unmount on the frontend.
+    const base44 = createClient({
+      appId: Deno.env.get("BASE44_APP_ID"),
+      serviceRole: true,
+    });
 
     const { eval_run_id, test_cases, pipeline, llm, database, db_schema, run_name } = await req.json();
 
@@ -232,7 +237,7 @@ Deno.serve(async (req) => {
     );
 
     // Update eval result entity
-    await base44.asServiceRole.entities.EvalResult.update(eval_run_id, {
+    await base44.entities.EvalResult.update(eval_run_id, {
       results,
       total_cases: results.length,
       valid_sql_count: validSqlCount,
