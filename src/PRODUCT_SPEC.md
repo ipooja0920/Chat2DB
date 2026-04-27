@@ -8,6 +8,10 @@
 
 # Demo Video and Screenshots
 
+Click below to watch the project demo:
+
+[![Demo Video](assets/demo-thumbnail.png)](https://drive.google.com/file/d/1gdhwztk1LKeYzTRks7ENPs_cv1gWPnVT/view?usp=drive_link)
+
 Watch the project demo here: [Demo Video](https://drive.google.com/file/d/1gdhwztk1LKeYzTRks7ENPs_cv1gWPnVT/view?usp=drive_link)
 
 
