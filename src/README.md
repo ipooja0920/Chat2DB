@@ -27,7 +27,6 @@ Chat2DB is a natural language database interface powered by AI. Users type quest
 
 Before running this app, make sure you have:
 
-- A [Base44](https://base44.com) account (the platform this app is built on)
 - An **OpenAI API Key** (for GPT-based pipelines)
 - An **Anthropic API Key** (for Claude-based pipelines)
 - Node.js 18+ (if running locally via Base44 CLI)
@@ -37,7 +36,7 @@ Before running this app, make sure you have:
 
 ## Environment Variables / Secrets
 
-Set the following secrets in your Base44 dashboard under **Settings → Environment Variables**:
+Set the following secrets in your own code **Settings → Environment Variables**:
 
 | Secret Name         | Description                              | Required |
 |---------------------|------------------------------------------|----------|
