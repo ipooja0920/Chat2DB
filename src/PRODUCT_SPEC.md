@@ -468,9 +468,9 @@ Every user question triggers agents in this exact order:
                           │
                           ▼
 ┌────────────────────────────────────────────────────────┐
-│               BASE44 INTEGRATION LAYER                 │
+│               INTEGRATION LAYER                 │
 │                                                        │
-│         base44.integrations.Core.InvokeLLM()          │
+│         integrations.Core.InvokeLLM()          │
 │           (routes to OpenAI or Claude)                 │
 └────────────────────────────────────────────────────────┘
                           │
