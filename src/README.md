@@ -27,6 +27,7 @@ Chat2DB is a natural language database interface powered by AI. Users type quest
 
 Before running this app, make sure you have:
 
+- This app is hosted on Base44
 - An **OpenAI API Key** (for GPT-based pipelines)
 - An **Anthropic API Key** (for Claude-based pipelines)
 - Node.js 18+ (if running locally via Base44 CLI)
