@@ -112,7 +112,7 @@ Most people who need insights from databases cannot write SQL. Even analysts who
 - **Hybrid**: Combines RAG + TAG for maximum accuracy; default mode
 
 ### 5.3 LLM Selection
-- **OpenAI GPT-4** (`gpt_5` model via Base44 integration)
+- **OpenAI GPT-4** (`gpt_5` model)
 - **Anthropic Claude Sonnet** (`claude_sonnet_4_6` model)
 - User can switch LLM mid-session from the TopBar
 
