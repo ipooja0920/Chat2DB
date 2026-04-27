@@ -38,7 +38,19 @@ export default function Chat() {
 
   // conversations: last 5 entries, each owns a thread snapshot
   // { id, title, time, thread: Message[] }
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState(() => {
+    try {
+      const raw = localStorage.getItem("chat2db_conversations");
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+
+  // Persist conversations to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem("chat2db_conversations", JSON.stringify(conversations));
+    } catch {}
+  }, [conversations]);
 
   // Push a conversation entry with the current thread snapshot (up to this message)
   // id is unique per entry so follow-ups get their own entry
@@ -65,6 +77,7 @@ export default function Chat() {
     setActiveTab("dashboard");
     setQueryResults({});
     setConversations([]);
+    localStorage.removeItem("chat2db_conversations");
   }, []);
 
   const runQueryInTab = useCallback(async (question, tabId, onComplete, conversationHistory = []) => {
