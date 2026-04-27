@@ -724,23 +724,25 @@ Both use **jsPDF** (no server-side rendering required — fully client-side).
 5. Click **Publish**
 
 ### Local Development
+
+This project uses **Docker** for local development. All services (frontend, backend functions, database) are containerized and managed via Docker Compose.
+
 ```bash
 # 1. Clone the repo
 git clone https://github.com/ipooja0920/<repo-name>
 cd <repo-name>
 
-# 2. Install dependencies
-npm install
-
-# 3. Create .env file
+# 2. Create .env file
 echo "OPENAI_API_KEY=your_key_here" >> .env
 echo "ANTHROPIC_API_KEY=your_key_here" >> .env
 
-# 4. Start dev server
-npm run dev
+# 3. Start all services via Docker
+docker compose up --build
 
 # App will be available at http://localhost:5173
 ```
+
+> **⚠️ Non-Docker Setup:** If you are **not** using Docker, you will need to manually configure your database connection. Update the database host, port, credentials, and connection string in your environment variables or config file to point to your local or remote database instance. The default Docker setup uses pre-configured service names (e.g., `db`) as hostnames — these will not resolve outside of Docker networking and must be replaced with the appropriate host (e.g., `localhost` or your DB server's IP).
 
 ---
 
