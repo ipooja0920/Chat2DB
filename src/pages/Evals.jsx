@@ -38,30 +38,43 @@ export default function Evals() {
       status: "running"
     });
     setRunningId(record.id);
-
-    try {
-      // Invoke backend function
-      await base44.functions.invoke("runEvals", {
-        eval_run_id: record.id,
-        test_cases: testCases,
-        pipeline,
-        llm,
-        database,
-        db_schema: dbSchema,
-        run_name: runName
-      });
-    } catch (err) {
-      // Mark as failed if the function times out or errors
-      await base44.entities.EvalResult.update(record.id, {
-        status: "failed"
-      });
-      setRunningId(null);
-      throw err;
-    }
-
-    setRunningId(null);
-    await loadHistory();
     setView("history");
+    await loadHistory();
+
+    // Fire-and-forget: don't await — poll for completion instead
+    base44.functions.invoke("runEvals", {
+      eval_run_id: record.id,
+      test_cases: testCases,
+      pipeline,
+      llm,
+      database,
+      db_schema: dbSchema,
+      run_name: runName
+    }).then(async () => {
+      setRunningId(null);
+      await loadHistory();
+    }).catch(async () => {
+      // Mark as failed only if still "running" (not manually terminated)
+      try {
+        const current = await base44.entities.EvalResult.filter({ id: record.id });
+        if (current?.[0]?.status === "running") {
+          await base44.entities.EvalResult.update(record.id, { status: "failed" });
+        }
+      } catch {}
+      setRunningId(null);
+      await loadHistory();
+    });
+
+    // Poll every 5s to refresh history while running
+    const pollInterval = setInterval(async () => {
+      const runs = await base44.entities.EvalResult.list("-created_date", 20);
+      setEvalHistory(runs);
+      const thisRun = runs.find(r => r.id === record.id);
+      if (thisRun && thisRun.status !== "running") {
+        clearInterval(pollInterval);
+        setRunningId(null);
+      }
+    }, 5000);
   };
 
   const handleTerminate = async (runId) => {
