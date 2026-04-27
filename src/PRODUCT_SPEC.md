@@ -71,6 +71,12 @@ Evals :-
 
 The application is built on a React + Deno BaaS platform and leverages **OpenAI GPT-4** and **Anthropic Claude Sonnet** as LLM backends, with three distinct AI reasoning pipelines: **RAG (Standard)**, **TAG (standalone)- only used in eval/testing)**, and **Hybrid (RAG + TAG)**.
 
+Why Hybrid is better for complex queries:
+
+- RAG component retrieves relevant schema documentation → understands business context
+- TAG component analyzes table relationships → synthesizes optimal SQL structure
+- Combined in one call → LLM has full context to generate better SQL without multiple round-trips
+
 ---
 
 ## 2. Problem Statement
