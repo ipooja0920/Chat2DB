@@ -1,5 +1,6 @@
 import { base44 } from "@/api/base44Client";
 import { classifyQuestion } from "@/lib/questionClassifier";
+import { logQueryCost } from "@/lib/costTracker";
 
 const MODEL_MAP = {
   OpenAI: "gpt_5",
@@ -329,6 +330,21 @@ export async function runQuery(question, mode, llmProvider, databaseId = "chinoo
 
   // Add execution time to result
   result.execution_time_ms = Math.round(Date.now() - startTime);
-  
+
+  // Determine the actual model used
+  const modelKey = classification.recommended_model === "gpt_5_mini"
+    ? "gpt_5_mini"
+    : effectiveLlm === "Claude" ? "claude_sonnet_4_6" : "gpt_5";
+
+  // Log cost asynchronously (fire-and-forget)
+  logQueryCost({
+    question,
+    model: modelKey,
+    pipeline: mode,
+    database: databaseId,
+    result,
+    promptText: question + contextMessages,
+  });
+
   return result;
 }

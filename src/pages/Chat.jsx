@@ -9,6 +9,7 @@ import OverflowDialog from "@/components/chat/OverflowDialog";
 import Favorites from "@/pages/Favorites";
 import SavedQueries from "@/pages/SavedQueries";
 import ExploreSchema from "@/pages/ExploreSchema";
+import CostDashboard from "@/pages/CostDashboard";
 import { runQuery, getDatabaseById, DATABASES, clearSchemaCache } from "@/lib/queryEngine";
 import { useFavorites } from "@/hooks/useFavorites";
 import { useSavedQueries } from "@/hooks/useSavedQueries";
@@ -217,6 +218,7 @@ export default function Chat() {
   const isFavoritesPage = activePage === "Favorites";
   const isSavedQueriesPage = activePage === "Saved Queries";
   const isExploreSchemaPage = activePage === "Explore Schema";
+  const isCostDashboardPage = activePage === "Cost Dashboard";
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
@@ -272,7 +274,9 @@ export default function Chat() {
 
         {/* Content */}
         <div className="flex-1 flex flex-col overflow-hidden bg-card mx-5 mb-0 rounded-t-xl border border-b-0 border-border shadow-sm">
-          {isExploreSchemaPage ? (
+          {isCostDashboardPage ? (
+            <CostDashboard />
+          ) : isExploreSchemaPage ? (
             <ExploreSchema database={database} />
           ) : isFavoritesPage ? (
             <Favorites

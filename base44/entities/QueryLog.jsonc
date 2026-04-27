@@ -1,0 +1,48 @@
+{
+  "name": "QueryLog",
+  "type": "object",
+  "properties": {
+    "question": {
+      "type": "string",
+      "description": "The user's natural language question"
+    },
+    "model": {
+      "type": "string",
+      "description": "LLM model used (gpt_5_mini, gpt_5, claude_sonnet_4_6)"
+    },
+    "pipeline": {
+      "type": "string",
+      "description": "Pipeline used (Hybrid, Standard, TAG)"
+    },
+    "database": {
+      "type": "string",
+      "description": "Database queried (chinook, northwind)"
+    },
+    "estimated_input_tokens": {
+      "type": "number",
+      "description": "Estimated input tokens"
+    },
+    "estimated_output_tokens": {
+      "type": "number",
+      "description": "Estimated output tokens"
+    },
+    "estimated_cost_usd": {
+      "type": "number",
+      "description": "Estimated cost in USD"
+    },
+    "execution_time_ms": {
+      "type": "number",
+      "description": "Query execution time in ms"
+    },
+    "intent": {
+      "type": "string",
+      "description": "Query intent classification"
+    }
+  },
+  "required": [
+    "question",
+    "model",
+    "pipeline",
+    "database"
+  ]
+}
