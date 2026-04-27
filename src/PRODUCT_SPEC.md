@@ -11,6 +11,10 @@ Demo : https://drive.google.com/drive/u/2/folders/1xDH0A_1ai49FuV9e8O05ecEJYm2UX
 
 <img width="1030" height="596" alt="Screenshot 2026-04-26 at 11 34 31 PM" src="https://github.com/user-attachments/assets/78e1808e-0035-4c99-9062-eb8a6704804f" />
 
+Evals :- 
+
+<img width="642" height="129" alt="Screenshot 2026-04-27 at 2 31 06 PM" src="https://github.com/user-attachments/assets/555f63cc-2a66-4d4b-b801-573d0025fbdc" />
+
 
 
 ### Changelog
