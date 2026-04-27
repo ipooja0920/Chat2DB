@@ -167,6 +167,69 @@ Rules:
   };
 }
 
+// ─── Background worker ────────────────────────────────────────────────────────
+
+async function runEvalWork(base44, eval_run_id, test_cases, pipeline, llm, db_schema) {
+  // Run all test cases in parallel
+  const results = await Promise.all(test_cases.map(async (tc) => {
+    const { question, expected_sql, expected_translatable = true, expected_rows = [], expected_cols = [] } = tc;
+
+    const { sql: generatedSql, is_translatable } = await generateSql(base44, question, pipeline, llm, db_schema);
+
+    const sqlValidity = checkSqlValidity(generatedSql);
+    const translatableCorrect = is_translatable === expected_translatable;
+    const sqlSim = sequenceSimilarity(expected_sql, generatedSql);
+
+    const generatedCols = generatedSql
+      ? (generatedSql.match(/SELECT\s+(.*?)\s+FROM/i)?.[1] || "")
+          .split(",")
+          .map(c => c.trim().split(/\s+as\s+/i).pop().trim().replace(/["`]/g, ""))
+          .filter(Boolean)
+      : [];
+
+    const rsSim = resultSetSimilarity(expected_rows, [], expected_cols, generatedCols);
+    const cosSim = cosineSimilarity(expected_rows, expected_rows);
+
+    return {
+      question,
+      expected_sql,
+      generated_sql: generatedSql,
+      is_valid_sql: sqlValidity.isValid,
+      is_translatable,
+      expected_translatable,
+      translatable_correct: translatableCorrect,
+      sql_similarity: Math.round(sqlSim * 1000) / 1000,
+      result_col_sim: Math.round(rsSim.cols_sim * 1000) / 1000,
+      result_row_sim: Math.round(rsSim.rows_sim * 1000) / 1000,
+      result_total_sim: Math.round(rsSim.total_sim * 1000) / 1000,
+      cosine_sim: Math.round(cosSim * 1000) / 1000,
+      explanation: sqlValidity.errMessage || "OK"
+    };
+  }));
+
+  const validSqlCount = results.filter(r => r.is_valid_sql).length;
+  const translatableCorrect = results.filter(r => r.translatable_correct).length;
+  const avgSqlSim = results.reduce((s, r) => s + r.sql_similarity, 0) / results.length;
+  const avgCosSim = results.reduce((s, r) => s + r.cosine_sim, 0) / results.length;
+  const overallScore = (
+    (validSqlCount / results.length) * 0.3 +
+    (translatableCorrect / results.length) * 0.2 +
+    avgSqlSim * 0.3 +
+    avgCosSim * 0.2
+  );
+
+  await base44.asServiceRole.entities.EvalResult.update(eval_run_id, {
+    results,
+    total_cases: results.length,
+    valid_sql_count: validSqlCount,
+    translatable_accuracy: Math.round((translatableCorrect / results.length) * 1000) / 1000,
+    avg_sql_similarity: Math.round(avgSqlSim * 1000) / 1000,
+    avg_cosine_similarity: Math.round(avgCosSim * 1000) / 1000,
+    overall_score: Math.round(overallScore * 1000) / 1000,
+    status: "completed"
+  });
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -179,70 +242,20 @@ Deno.serve(async (req) => {
       return Response.json({ error: "No test cases provided" }, { status: 400 });
     }
 
-    // Run all test cases in parallel for speed
-    const results = await Promise.all(test_cases.map(async (tc) => {
-      const { question, expected_sql, expected_translatable = true, expected_rows = [], expected_cols = [] } = tc;
+    // Use EdgeRuntime.waitUntil to run eval in background — return 200 immediately
+    // so the HTTP request doesn't time out while waiting for all LLM calls
+    const work = runEvalWork(base44, eval_run_id, test_cases, pipeline, llm, db_schema)
+      .catch(async () => {
+        await base44.asServiceRole.entities.EvalResult.update(eval_run_id, { status: "failed" });
+      });
 
-      // Generate SQL
-      const { sql: generatedSql, is_translatable } = await generateSql(base44, question, pipeline, llm, db_schema);
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      EdgeRuntime.waitUntil(work);
+    } else {
+      await work; // fallback for local dev
+    }
 
-      // Metrics
-      const sqlValidity = checkSqlValidity(generatedSql);
-      const translatableCorrect = is_translatable === expected_translatable;
-      const sqlSim = sequenceSimilarity(expected_sql, generatedSql);
-
-      const generatedCols = generatedSql
-        ? (generatedSql.match(/SELECT\s+(.*?)\s+FROM/i)?.[1] || "")
-            .split(",")
-            .map(c => c.trim().split(/\s+as\s+/i).pop().trim().replace(/["`]/g, ""))
-            .filter(Boolean)
-        : [];
-
-      const rsSim = resultSetSimilarity(expected_rows, [], expected_cols, generatedCols);
-      const cosSim = cosineSimilarity(expected_rows, expected_rows);
-
-      return {
-        question,
-        expected_sql,
-        generated_sql: generatedSql,
-        is_valid_sql: sqlValidity.isValid,
-        is_translatable,
-        expected_translatable,
-        translatable_correct: translatableCorrect,
-        sql_similarity: Math.round(sqlSim * 1000) / 1000,
-        result_col_sim: Math.round(rsSim.cols_sim * 1000) / 1000,
-        result_row_sim: Math.round(rsSim.rows_sim * 1000) / 1000,
-        result_total_sim: Math.round(rsSim.total_sim * 1000) / 1000,
-        cosine_sim: Math.round(cosSim * 1000) / 1000,
-        explanation: sqlValidity.errMessage || "OK"
-      };
-    }));
-
-    // Aggregate metrics
-    const validSqlCount = results.filter(r => r.is_valid_sql).length;
-    const translatableCorrect = results.filter(r => r.translatable_correct).length;
-    const avgSqlSim = results.reduce((s, r) => s + r.sql_similarity, 0) / results.length;
-    const avgCosSim = results.reduce((s, r) => s + r.cosine_sim, 0) / results.length;
-    const overallScore = (
-      (validSqlCount / results.length) * 0.3 +
-      (translatableCorrect / results.length) * 0.2 +
-      avgSqlSim * 0.3 +
-      avgCosSim * 0.2
-    );
-
-    // Update eval result entity
-    await base44.asServiceRole.entities.EvalResult.update(eval_run_id, {
-      results,
-      total_cases: results.length,
-      valid_sql_count: validSqlCount,
-      translatable_accuracy: Math.round((translatableCorrect / results.length) * 1000) / 1000,
-      avg_sql_similarity: Math.round(avgSqlSim * 1000) / 1000,
-      avg_cosine_similarity: Math.round(avgCosSim * 1000) / 1000,
-      overall_score: Math.round(overallScore * 1000) / 1000,
-      status: "completed"
-    });
-
-    return Response.json({ success: true, results_count: results.length, overall_score: overallScore });
+    return Response.json({ success: true, message: "Eval started in background" });
 
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
