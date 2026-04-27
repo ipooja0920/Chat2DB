@@ -133,21 +133,18 @@ function cosineSimilarity(rows1, rows2) {
 // ─── LLM SQL Generation ───────────────────────────────────────────────────────
 
 async function generateSql(base44, question, pipeline, llm, dbSchema) {
-  // Use mini model for evals — much faster, SQL generation doesn't need full reasoning power
-  const modelMap = { OpenAI: "gpt_5_mini", Claude: "gpt_5_mini" };
-  const model = modelMap[llm] || "gpt_5_mini";
+  const model = "gpt_5_mini";
 
-  const prompt = `You are a SQL expert. Using the database schema below, generate a precise SQL SELECT query to answer the user's question.
+  const prompt = `You are a SQL expert. Given the schema below, output a JSON object with two fields:
+1. "sql": a valid SQL SELECT query answering the question, or "" if the question cannot be answered with SQL
+2. "translatable": true if the question can be answered with SQL, false otherwise
 
-Database Schema:
+Schema:
 ${dbSchema}
 
-User Question: ${question}
+Question: ${question}
 
-Rules:
-- Return ONLY the SQL query, no explanation, no markdown
-- Use only tables/columns that exist in the schema
-- Only generate SELECT queries`;
+Respond ONLY with valid JSON, no explanation.`;
 
   const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
     model,
@@ -155,15 +152,16 @@ Rules:
     response_json_schema: {
       type: "object",
       properties: {
-        sql_query: { type: "string" },
-        is_translatable: { type: "boolean", description: "Whether the question can be answered with SQL" }
-      }
+        sql: { type: "string" },
+        translatable: { type: "boolean" }
+      },
+      required: ["sql", "translatable"]
     }
   });
 
   return {
-    sql: cleanSql(result.sql_query || ""),
-    is_translatable: result.is_translatable !== false
+    sql: cleanSql(result.sql || ""),
+    is_translatable: result.translatable !== false
   };
 }
 
