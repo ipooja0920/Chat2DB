@@ -133,8 +133,9 @@ function cosineSimilarity(rows1, rows2) {
 // ─── LLM SQL Generation ───────────────────────────────────────────────────────
 
 async function generateSql(base44, question, pipeline, llm, dbSchema) {
-  const modelMap = { OpenAI: "gpt_5", Claude: "claude_sonnet_4_6" };
-  const model = modelMap[llm] || "gpt_5";
+  // Use mini model for evals — much faster, SQL generation doesn't need full reasoning power
+  const modelMap = { OpenAI: "gpt_5_mini", Claude: "gpt_5_mini" };
+  const model = modelMap[llm] || "gpt_5_mini";
 
   const prompt = `You are a SQL expert. Using the database schema below, generate a precise SQL SELECT query to answer the user's question.
 
