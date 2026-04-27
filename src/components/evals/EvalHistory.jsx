@@ -46,7 +46,7 @@ export default function EvalHistory({ runs, onSelectRun, onRefresh, runningId, o
         {runs.map((run) => {
           const isRunning = run.id === runningId || run.status === "running";
           const date = run.created_date
-            ? new Date(run.created_date).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+            ? new Date(run.created_date).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
             : "";
           return (
             <div
