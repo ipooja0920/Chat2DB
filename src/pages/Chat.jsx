@@ -36,21 +36,33 @@ export default function Chat() {
   // Each Message: { id, question, ...llmResponse } | { _loading: true, question }
   const [queryResults, setQueryResults] = useState({});
 
-  // conversations: last 5 entries, each owns a thread snapshot
-  // { id, title, time, thread: Message[] }
-  const [conversations, setConversations] = useState(() => {
+  // allConversations: { [databaseId]: last 5 entries }
+  const [allConversations, setAllConversations] = useState(() => {
     try {
-      const raw = localStorage.getItem("chat2db_conversations");
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
+      const raw = localStorage.getItem("chat2db_conversations_v2");
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
   });
 
-  // Persist conversations to localStorage whenever they change
+  // Conversations for the currently active database
+  const conversations = allConversations[database] || [];
+
+  const setConversations = (updater) => {
+    setAllConversations((prev) => {
+      const current = prev[database] || [];
+      const next = typeof updater === "function" ? updater(current) : updater;
+      const updated = { ...prev, [database]: next };
+      try { localStorage.setItem("chat2db_conversations_v2", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  // Persist allConversations to localStorage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem("chat2db_conversations", JSON.stringify(conversations));
+      localStorage.setItem("chat2db_conversations_v2", JSON.stringify(allConversations));
     } catch {}
-  }, [conversations]);
+  }, [allConversations]);
 
   // Push a conversation entry with the current thread snapshot (up to this message)
   // id is unique per entry so follow-ups get their own entry
@@ -76,8 +88,7 @@ export default function Chat() {
     setTabs([]);
     setActiveTab("dashboard");
     setQueryResults({});
-    setConversations([]);
-    localStorage.removeItem("chat2db_conversations");
+    // Don't clear conversations — each DB keeps its own history
   }, []);
 
   const runQueryInTab = useCallback(async (question, tabId, onComplete, conversationHistory = []) => {
