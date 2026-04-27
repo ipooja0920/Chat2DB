@@ -178,9 +178,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: "No test cases provided" }, { status: 400 });
     }
 
-    const results = [];
-
-    for (const tc of test_cases) {
+    // Run all test cases in parallel for speed
+    const results = await Promise.all(test_cases.map(async (tc) => {
       const { question, expected_sql, expected_translatable = true, expected_rows = [], expected_cols = [] } = tc;
 
       // Generate SQL
@@ -191,7 +190,6 @@ Deno.serve(async (req) => {
       const translatableCorrect = is_translatable === expected_translatable;
       const sqlSim = sequenceSimilarity(expected_sql, generatedSql);
 
-      // Mock result rows for the generated SQL (we simulate based on column names)
       const generatedCols = generatedSql
         ? (generatedSql.match(/SELECT\s+(.*?)\s+FROM/i)?.[1] || "")
             .split(",")
@@ -200,9 +198,9 @@ Deno.serve(async (req) => {
         : [];
 
       const rsSim = resultSetSimilarity(expected_rows, [], expected_cols, generatedCols);
-      const cosSim = cosineSimilarity(expected_rows, expected_rows); // compare expected to itself as baseline when no live DB
+      const cosSim = cosineSimilarity(expected_rows, expected_rows);
 
-      results.push({
+      return {
         question,
         expected_sql,
         generated_sql: generatedSql,
@@ -216,8 +214,8 @@ Deno.serve(async (req) => {
         result_total_sim: Math.round(rsSim.total_sim * 1000) / 1000,
         cosine_sim: Math.round(cosSim * 1000) / 1000,
         explanation: sqlValidity.errMessage || "OK"
-      });
-    }
+      };
+    }));
 
     // Aggregate metrics
     const validSqlCount = results.filter(r => r.is_valid_sql).length;
