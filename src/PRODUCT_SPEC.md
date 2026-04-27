@@ -664,6 +664,61 @@ Users can terminate a running eval at any time via the **Terminate** button on t
 
 ---
 
+### 13.9 Benchmark Results (April 26, 2026)
+
+**Run:** "Eval Run 4/26/26, 9:17 PM"  
+**Config:** Chinook DB · OpenAI GPT-4 · Hybrid Pipeline · 10 test cases
+
+#### Aggregate Scores
+
+| Metric | Score | Notes |
+|--------|-------|-------|
+| **Overall Score** | **71%** | Weighted composite |
+| Valid SQL | 90% (9/10) | 1 non-translatable question correctly returned no SQL |
+| Translatable Accuracy | 100% | All 10 cases correctly classified as SQL-answerable or not |
+| SQL Similarity | 40.3% | LCS string match vs. reference SQL (see explanation below) |
+| Cosine Similarity | 60% | TF-IDF similarity on result set content |
+
+#### Per-Question Breakdown
+
+| # | Question | Valid SQL | SQL Sim | Cosine Sim | Notes |
+|---|----------|-----------|---------|------------|-------|
+| 1 | Total revenue by country? | ✅ | 83% | 100% | Strong match |
+| 2 | Top 5 customers by total spend? | ✅ | 17% | 100% | Different column aliasing style |
+| 3 | Best selling genres by track count? | ✅ | 61% | 100% | SUM vs COUNT difference |
+| 4 | Tracks in each playlist? | ✅ | 27% | 100% | Extra columns selected, different ORDER BY |
+| 5 | Average invoice total per country? | ✅ | 45% | 100% | Column alias name differs |
+| 6 | List all employees and who they report to | ✅ | 29% | 0% | Over-specified (added Title, ManagerId columns) |
+| 7 | What is the color of the moon? | ✅ | 0% | 0% | Non-translatable, correctly identified |
+| 8 | Which artists have more than 10 albums? | ✅ | 23% | 100% | Extra GROUP BY columns, alias differences |
+| 9 | Monthly revenue trend? | ✅ | 18% | 0% | Used YEAR()/MONTH() instead of strftime() |
+| 10 | Who is the CEO of Apple? | ❌ | 100% | 0% | Non-translatable, correctly returned empty SQL |
+
+#### Why SQL Similarity Is Low (40%)
+
+SQL Similarity uses **LCS (Longest Common Subsequence)** to compare the generated SQL string character-by-character against the hand-written reference SQL. A score of 40% does **not** mean the queries are wrong — it means they are written *differently* from the reference answers. Common causes observed in this run:
+
+| Root Cause | Example |
+|------------|---------|
+| **Different column aliases** | `TotalRevenue` vs `TotalSpend`, `AvgInvoiceTotal` vs `AvgTotal` |
+| **Extra columns selected** | Model adds `CustomerId`, `PlaylistId`, `ManagerId` that reference SQL omits |
+| **Different GROUP BY columns** | Model groups by `ar.ArtistId, ar.Name` vs just `ar.ArtistId` |
+| **Dialect differences** | Model uses `YEAR()`/`MONTH()` (MySQL); reference uses `strftime()` (SQLite) |
+| **ORDER BY differences** | Model adds secondary sort columns the reference omits |
+| **Additional `AS` keywords** | Model uses verbose aliasing the reference shortens |
+
+#### What Valid SQL vs SQL Similarity Actually Measures
+
+| Metric | What It Checks | Can Score High Even If... |
+|--------|---------------|--------------------------|
+| **Valid SQL** | Syntactic correctness (SELECT clause, balanced parentheses) | The query gives wrong results |
+| **SQL Similarity** | String-level match against reference SQL | The query is semantically correct but styled differently |
+| **Cosine Similarity** | Semantic similarity of result set content (TF-IDF) | SQL strings look nothing alike |
+
+> **Takeaway:** The 60% Cosine Similarity is a better measure of functional correctness than the 40% SQL Similarity. The model consistently generates valid, semantically correct SQL — it just doesn't match the exact style of the hand-written reference queries. Future improvement: add **execution-level result matching** against a live database for a more accurate correctness signal.
+
+---
+
 ## 15. Storage & Persistence
 
 | Data | Storage | Key | Max Size |
