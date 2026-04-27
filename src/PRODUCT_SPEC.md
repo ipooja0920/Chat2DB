@@ -52,7 +52,7 @@ Demo : https://drive.google.com/drive/u/2/folders/1xDH0A_1ai49FuV9e8O05ecEJYm2UX
 - Provides plain-English explanations
 - Allows export of results to PDF
 
-The application is built on **Base44** (a React + Deno BaaS platform) and leverages **OpenAI GPT-4** and **Anthropic Claude Sonnet** as LLM backends, with three distinct AI reasoning pipelines: **RAG**, **TAG**, and **Hybrid**.
+The application is built on a React + Deno BaaS platform and leverages **OpenAI GPT-4** and **Anthropic Claude Sonnet** as LLM backends, with three distinct AI reasoning pipelines: **RAG**, **TAG**, and **Hybrid**.
 
 ---
 
