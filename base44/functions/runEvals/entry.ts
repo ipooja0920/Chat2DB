@@ -167,11 +167,23 @@ Rules:
   };
 }
 
+// ─── Batch helper — run N tasks concurrently ──────────────────────────────────
+
+async function runInBatches(items, batchSize, fn) {
+  const results = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 // ─── Background worker ────────────────────────────────────────────────────────
 
 async function runEvalWork(base44, eval_run_id, test_cases, pipeline, llm, db_schema) {
-  // Run all test cases in parallel
-  const results = await Promise.all(test_cases.map(async (tc) => {
+  // Run test cases in batches of 3 to avoid rate-limit queuing
+  const results = await runInBatches(test_cases, 3, async (tc) => {
     const { question, expected_sql, expected_translatable = true, expected_rows = [], expected_cols = [] } = tc;
 
     const { sql: generatedSql, is_translatable } = await generateSql(base44, question, pipeline, llm, db_schema);
@@ -188,7 +200,7 @@ async function runEvalWork(base44, eval_run_id, test_cases, pipeline, llm, db_sc
       : [];
 
     const rsSim = resultSetSimilarity(expected_rows, [], expected_cols, generatedCols);
-    const cosSim = cosineSimilarity(expected_rows, expected_rows);
+    const cosSim = cosineSimilarity(expected_rows, expected_cols.length > 0 ? expected_rows : []);
 
     return {
       question,
@@ -205,7 +217,7 @@ async function runEvalWork(base44, eval_run_id, test_cases, pipeline, llm, db_sc
       cosine_sim: Math.round(cosSim * 1000) / 1000,
       explanation: sqlValidity.errMessage || "OK"
     };
-  }));
+  });
 
   const validSqlCount = results.filter(r => r.is_valid_sql).length;
   const translatableCorrect = results.filter(r => r.translatable_correct).length;
