@@ -2,7 +2,7 @@
 
 **Version:** 1.3  
 **Date:** 27th April 2026  
-**Author:** Product & Engineering  
+**Author:** Pooja Raj Lakshmi  
 **Status:** Active Development  
 
 
