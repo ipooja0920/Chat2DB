@@ -284,7 +284,7 @@ Query Result (columns + rows)
 - **Output:** Full response JSON including sources_count, tables_count
 - **Performance:** Single LLM call (more efficient than 2-call pipelines)
 
-### Agent 4: Visualization Agent (vizAgent)
+### Agent 4: Visualization Agent (vizAgent) — `lib/vizAgent.js`
 - **Role:** Determines optimal chart type and axis mapping
 - **Model:** `gpt_5_mini` (lightweight)
 - **Input:** Column names, data types, sample rows, original question
@@ -309,6 +309,21 @@ Query Result (columns + rows)
 - **Model routing:**
   - `gpt_5_mini` recommended for schema lookups and simple queries (fast, cheap)
   - `gpt_5` or `claude_sonnet_4_6` for complex multi-join and advanced analytics (accuracy-critical)
+
+### Agent 6: Anomaly Detection Analyst (anomalyAgent)
+- **Role:** Identifies outliers, spikes, drops, gaps, and concentration patterns in query result data
+- **Model:** `gpt_5_mini` (lightweight)
+- **Input:** Original question + column schema + up to 20 sample rows
+- **Output:** Array of anomalies, each with title, description, severity, and type; plus a `suitable` flag indicating whether anomaly detection is meaningful for this dataset
+- **Severity levels:** `high` (red), `medium` (amber), `low` (blue)
+- **Anomaly types detected:** outlier, gap, concentration, spike, drop, and more
+- **Triggered:** Lazily on first click of the Anomalies tab (not on every query)
+- **Limitations:**
+  - Analyzes only the first 20 rows — anomalies in the tail of large result sets may be missed
+  - LLM-based reasoning (no true statistical tests like z-score or IQR) — pattern detection is heuristic, not mathematically rigorous
+  - Costs integration credits on every tab open (mitigated by `gpt_5_mini` being the cheapest model)
+  - May return false positives on datasets with naturally skewed distributions (e.g., power-law revenue data)
+  - Not suitable for purely text-based result sets with no numeric columns; returns `suitable: false` in those cases
 
 ### Why Single-Agent Hybrid Over Multi-Agent Architecture
 
@@ -764,6 +779,8 @@ Early iterations exhibited slow execution due to:
 
 ## 20. Constraints & Limitations
 
+### General System Limitations
+
 | Constraint | Detail |
 |------------|--------|
 | Read-only SQL | Only SELECT queries are generated (no INSERT/UPDATE/DELETE) |
@@ -773,6 +790,34 @@ Early iterations exhibited slow execution due to:
 | Session state | Tabs and results lost on page refresh |
 | LLM latency | Hybrid pipeline: ~3–8s per query depending on complexity (post-optimization) |
 | Chart suitability | Not all datasets are chartable; vizAgent may mark as unsuitable |
+
+### Anomaly Detection Agent Limitations
+
+| Limitation | Detail |
+|------------|--------|
+| Row cap | Only the first 20 rows are analyzed — anomalies in the tail of large result sets may be missed |
+| No true statistics | Uses LLM reasoning, not formal statistical tests (z-score, IQR, Grubbs' test) — detection is heuristic, not mathematically rigorous |
+| Credit cost | Charges integration credits on every Anomalies tab open; mitigated by using `gpt_5_mini` (cheapest model) |
+| False positives | May flag naturally skewed distributions (e.g., power-law revenue data, Pareto-distributed sales) as anomalous |
+| Text-only data | Returns `suitable: false` for result sets with no numeric or quantitative columns |
+| No time-series awareness | Cannot detect seasonal patterns or cyclical anomalies without explicit date columns in the result |
+| Single-pass only | Anomaly detection runs once per tab open and is not re-run if the underlying data changes |
+
+### Visualization Agent Limitations
+
+| Limitation | Detail |
+|------------|--------|
+| Sample-based inference | Uses only 5 sample rows for column type inference — may misclassify columns on sparse or mixed-type data |
+| No custom chart config | Users cannot override the AI's chart type selection |
+| Unsuitable rejection | Datasets without sufficient numeric columns are rejected entirely (no partial chart offered) |
+
+### SQL Generation Limitations
+
+| Limitation | Detail |
+|------------|--------|
+| Simulated results | Rows are LLM-generated approximations, not real query execution results |
+| Schema hallucination risk | On very complex queries, LLM may occasionally reference columns that exist in schema but produce implausible values |
+| No query optimization | Generated SQL is not analyzed for index usage or query plan efficiency |
 
 ---
 
