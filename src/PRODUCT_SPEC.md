@@ -1,6 +1,6 @@
 # Chat2DB — Extensive Product Specification
 
-**Version:** 1.1  
+**Version:** 1.3  
 **Date:** April 2026  
 **Author:** Product & Engineering  
 **Status:** Active Development  
