@@ -8,6 +8,7 @@
 ### Changelog
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2 | April 27, 2026 | Fixed eval run auth dependency on browser session — `runEvals` backend function now uses `createClient({ serviceRole: true })` instead of `createClientFromRequest(req)`, ensuring eval runs persist and complete even when the user navigates away from the Evals page |
 | 1.1 | April 27, 2026 | Fixed localStorage persistence bug for Favorites & Saved Queries; added localStorage persistence for Conversation History; refactored Eval runs to fire-and-forget with 5s polling to prevent timeout failures |
 | 1.0 | April 2026 | Initial release |
 
@@ -635,6 +636,14 @@ Eval runs are invoked using a **fire-and-forget pattern** on the frontend to avo
 5. If the function call rejects (e.g. network error), the frontend checks the current record status and marks it `failed` only if it was still `running` (to avoid overwriting a manual Terminate)
 
 This prevents the previous issue where awaiting the full eval run would trigger a function timeout on runs with many test cases.
+
+### 13.5.2 Session-Independent Backend Execution
+
+The `runEvals` backend function uses `createClient({ appId, serviceRole: true })` instead of `createClientFromRequest(req)`. This is a critical architectural decision:
+
+- **Problem:** `createClientFromRequest(req)` binds the SDK client to the incoming HTTP request's user auth token. If the user navigates away from the Evals page mid-run, the browser session context can become invalid, causing 401 Unauthorized errors that silently kill the eval run.
+- **Solution:** `createClient({ serviceRole: true })` initializes the SDK with the app's service role credentials from environment variables (`BASE44_APP_ID`), making it fully independent of the user's browser session.
+- **Result:** Eval runs now complete reliably regardless of frontend navigation, page refresh, or tab closure after the run is initiated.
 
 ### 13.6 Results UI
 
