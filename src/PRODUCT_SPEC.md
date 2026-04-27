@@ -7,6 +7,12 @@
 
 Demo : https://drive.google.com/drive/u/2/folders/1xDH0A_1ai49FuV9e8O05ecEJYm2UXf3m and https://drive.google.com/drive/u/2/folders/1xDH0A_1ai49FuV9e8O05ecEJYm2UXf3m
 
+<img width="1033" height="597" alt="Screenshot 2026-04-26 at 11 32 55 PM" src="https://github.com/user-attachments/assets/782d3e6d-e15f-4d58-ae33-e4dda9c9faf5" />
+
+<img width="1030" height="596" alt="Screenshot 2026-04-26 at 11 34 31 PM" src="https://github.com/user-attachments/assets/78e1808e-0035-4c99-9062-eb8a6704804f" />
+
+
+
 ### Changelog
 | Version | Date | Changes |
 |---------|------|---------|
