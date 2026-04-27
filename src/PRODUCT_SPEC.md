@@ -6,7 +6,7 @@
 **Status:** Active Development  
 
 
-## Demo Video
+# Demo Video and Screenshots
 
 [![Watch the demo](assets/demo-thumbnail.png)](https://drive.google.com/file/d/1gdhwztk1LKeYzTRks7ENPs_cv1gWPnVT/view?usp=drive_link)
 
