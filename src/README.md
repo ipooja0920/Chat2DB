@@ -2,6 +2,8 @@
 
 > Ask questions in plain English. Get SQL, results, charts, and insights instantly.
 
+> 📖 **For full technical details, architecture diagrams, pipeline specs, evaluation methodology, and design decisions, please refer to the [Product Specification (PRODUCT_SPEC.md)](./PRODUCT_SPEC.md).**
+
 ---
 
 ## Table of Contents
