@@ -64,6 +64,12 @@ export default function Evals() {
     setView("history");
   };
 
+  const handleTerminate = async (runId) => {
+    await base44.entities.EvalResult.update(runId, { status: "failed" });
+    setRunningId(null);
+    await loadHistory();
+  };
+
   const handleSelectRun = (run) => {
     setSelectedRun(run);
     setView("detail");
@@ -119,6 +125,7 @@ export default function Evals() {
             onSelectRun={handleSelectRun}
             onRefresh={loadHistory}
             runningId={runningId}
+            onTerminate={handleTerminate}
           />
         )}
         {view === "detail" && selectedRun && (

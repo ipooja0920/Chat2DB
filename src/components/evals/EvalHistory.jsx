@@ -1,5 +1,6 @@
 import React from "react";
-import { RefreshCw, Loader2, CheckCircle2, XCircle, FlaskConical, Database, Cpu } from "lucide-react";
+import { RefreshCw, Loader2, CheckCircle2, XCircle, FlaskConical, Database, Cpu, StopCircle } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 function ScoreBadge({ score, label }) {
   const pct = Math.round((score || 0) * 100);
@@ -14,7 +15,7 @@ function ScoreBadge({ score, label }) {
   );
 }
 
-export default function EvalHistory({ runs, onSelectRun, onRefresh, runningId }) {
+export default function EvalHistory({ runs, onSelectRun, onRefresh, runningId, onTerminate }) {
   if (runs.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground p-12">
@@ -73,7 +74,7 @@ export default function EvalHistory({ runs, onSelectRun, onRefresh, runningId })
                     </span>
                     <span className="text-[11px] text-muted-foreground">{run.pipeline}</span>
                     <span className="text-[11px] text-muted-foreground">{run.total_cases} cases</span>
-                    {date && <span className="text-[11px] text-muted-foreground ml-auto">{date}</span>}
+                    {run.status === "completed" && date && <span className="text-[11px] text-muted-foreground ml-auto">{date}</span>}
                   </div>
                 </div>
                 {run.status === "completed" && (
@@ -82,7 +83,16 @@ export default function EvalHistory({ runs, onSelectRun, onRefresh, runningId })
                   </div>
                 )}
                 {isRunning && (
-                  <span className="text-xs text-primary font-medium flex-shrink-0 animate-pulse">Running...</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-primary font-medium animate-pulse">Running...</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onTerminate?.(run.id); }}
+                      className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-rose-500 border border-rose-300 hover:bg-rose-50 rounded-lg transition-colors"
+                    >
+                      <StopCircle className="w-3 h-3" />
+                      Terminate
+                    </button>
+                  </div>
                 )}
               </div>
 
